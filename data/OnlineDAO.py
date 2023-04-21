@@ -1,10 +1,26 @@
 import json
+import csv
 import urllib3
+import io
+import decimal
+
+from enum import Enum
+from time import time
+from datetime import datetime, timedelta
+
+from data.models import DailyData, DataProvider, Security
+
+
+class Interval(Enum):
+    HOURLY = "1h"
+    DAILY = "1d"
+    WEEKLY = "1wk"
+    MONTHLY = "1mo"
 
 
 class YahooOnlineDAO:
-    def __init__(self) -> None:
-        pass
+    def __init__(self, dao: DataProvider) -> None:
+        self.__data_provider__ = dao
 
     def lookupSymbol(self, symbol) -> dict:
         """
@@ -84,3 +100,61 @@ class YahooOnlineDAO:
         else:
             error = summary_profile["quoteSummary"]["error"]
             return {"error": error["description"]}
+
+    def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
+        """
+        returns, if found, the "historic" data set
+        """
+
+        to_time = int(round(time()))
+        start_time: datetime = datetime.today() - timedelta(days=look_back)
+        from_time = int(round(start_time.timestamp()))
+
+        # print(f"requesting from: {from_time} to: {to_time} with interval: {interval.value}")
+
+        http = urllib3.PoolManager()
+        r = http.request(
+            "GET",
+            "https://query1.finance.yahoo.com/v7/finance/download/" + security.symbol,
+            fields={
+                "period1": from_time,  # the date to start from in milliseconds
+                "period2": to_time,  # to date in milliseconds
+                "interval": interval.value,
+                "events": "history",
+            },
+        )
+
+        print(f"status for requesting 'history' of {security.symbol}: {r.status}")
+
+        data = r.data.decode("utf-8")
+
+        # print(data)
+
+        reader = csv.DictReader(io.StringIO(data), delimiter=",")
+        historic_entries = list()
+        for row in reader:
+            print(row)
+            date_str = row["Date"]
+            open_str = row["Open"]
+            high_str = row["High"]
+            low_str = row["Low"]
+            close_adj_str = row["Adj Close"]
+            close_str = row["Close"]
+            volume_str = row["Volume"]
+
+            entry = DailyData(
+                date = datetime.strptime(date_str, "%Y-%m-%d").date(),
+                data_provider = self.__data_provider__,
+                security = security,
+
+                open_price = decimal.Decimal(open_str),
+                high_price = decimal.Decimal(high_str),
+                low = decimal.Decimal(low_str),
+                close = decimal.Decimal(close_str),
+                adj_close = decimal.Decimal(close_adj_str),
+                volume = int(volume_str)
+            )
+
+            historic_entries.append(entry)
+
+        return historic_entries

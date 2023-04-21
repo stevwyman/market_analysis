@@ -1,14 +1,15 @@
+import csv
+from io import StringIO
+
 from django.test import TestCase
 
-from data.models import User, Watchlist, Security, DataProvider
-from data.OnlineDAO import YahooOnlineDAO
+from data.models import User, Watchlist, Security, DataProvider, DailyData
+from data.OnlineDAO import YahooOnlineDAO, Interval
 
 
 # Create your tests here.
 
 class YahooYCL(TestCase):
-
-    dao = YahooOnlineDAO()
 
     def setUp(self) -> None:
 
@@ -42,17 +43,40 @@ class YahooYCL(TestCase):
                 print(security)
                 print(security.watchlists.all())
 
+    def test_historic_import(self):
+
+        yahoo_dp = DataProvider.objects.get(name="Yahoo")
+        dao = YahooOnlineDAO(yahoo_dp)
+
+        watchlist = Watchlist.objects.get(name="Test List")
+
+        for security in watchlist.securities.all():
+            result = dao.lookupHistory(security, interval=Interval.DAILY, look_back=10)
+            DailyData.objects.bulk_create(result)
+
+        for security in watchlist.securities.all():
+            daily = DailyData.objects.filter(security=security, data_provider=yahoo_dp).all()
+            print(f"{security.symbol} daily has {daily.count()} entries")
+
 
     def test_read_quote_summary(self):
-        result = self.dao.lookupSymbol("AAPL")
+
+        yahoo_dp = DataProvider.objects.get(name="Yahoo")
+        dao = YahooOnlineDAO(yahoo_dp)
+
+        result = dao.lookupSymbol("AAPL")
         self.assertEqual(result["country"], "United States")
 
-        result = self.dao.lookupSymbol("AAPP")
+        result = dao.lookupSymbol("AAPP")
         self.assertEqual(result["error"], "Quote not found for ticker symbol: AAPP")
 
     def test_read_price(self):
-        result = self.dao.lookupPrice("AAPL")
+
+        yahoo_dp = DataProvider.objects.get(name="Yahoo")
+        dao = YahooOnlineDAO(yahoo_dp)
+    
+        result = dao.lookupPrice("AAPL")
         self.assertEqual(result["shortName"], "Apple Inc.")
 
-        result = self.dao.lookupPrice("AAPP")
+        result = dao.lookupPrice("AAPP")
         self.assertEqual(result["error"], "Quote not found for ticker symbol: AAPP")
