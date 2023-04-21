@@ -1,14 +1,14 @@
 import json
 import csv
 import urllib3
-import io
+from io import StringIO
 import decimal
 
 from enum import Enum
 from time import time
 from datetime import datetime, timedelta
 
-from data.models import DailyData, DataProvider, Security
+from data.models import Daily, Security
 
 
 class Interval(Enum):
@@ -19,8 +19,8 @@ class Interval(Enum):
 
 
 class YahooOnlineDAO:
-    def __init__(self, dao: DataProvider) -> None:
-        self.__data_provider__ = dao
+    def __init__(self) -> None:
+        pass
 
     def lookupSymbol(self, symbol) -> dict:
         """
@@ -130,7 +130,7 @@ class YahooOnlineDAO:
 
         # print(data)
 
-        reader = csv.DictReader(io.StringIO(data), delimiter=",")
+        reader = csv.DictReader(StringIO(data), delimiter=",")
         historic_entries = list()
         for row in reader:
             print(row)
@@ -142,9 +142,8 @@ class YahooOnlineDAO:
             close_str = row["Close"]
             volume_str = row["Volume"]
 
-            entry = DailyData(
+            entry = Daily(
                 date = datetime.strptime(date_str, "%Y-%m-%d").date(),
-                data_provider = self.__data_provider__,
                 security = security,
 
                 open_price = decimal.Decimal(open_str),

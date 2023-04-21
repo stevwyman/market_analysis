@@ -1,9 +1,6 @@
-import csv
-from io import StringIO
-
 from django.test import TestCase
 
-from data.models import User, Watchlist, Security, DataProvider, DailyData
+from data.models import User, Watchlist, Security, DataProvider, Daily
 from data.OnlineDAO import YahooOnlineDAO, Interval
 
 
@@ -11,21 +8,23 @@ from data.OnlineDAO import YahooOnlineDAO, Interval
 
 class YahooYCL(TestCase):
 
-    def setUp(self) -> None:
+    dao = YahooOnlineDAO()
 
-        apple = Security.objects.create(symbol="AAPL", name="Apple Inc.")
-        microsoft = Security.objects.create(symbol="MSFT", name="Microsoft Inc.")
-        alphabet = Security.objects.create(symbol="GOOGL", name="Alphabet Inc.")
+    def setUp(self) -> None:
 
         yahoo = DataProvider.objects.create(name="Yahoo")
         manager = User.objects.create(role=User.MANAGER)
 
-        test_list_1 = Watchlist.objects.create(name="Test List", user=manager, visibility="USER", data_provider=yahoo)
+        apple = Security.objects.create(symbol="AAPL", name="Apple Inc.", data_provider=yahoo)
+        microsoft = Security.objects.create(symbol="MSFT", name="Microsoft Inc.", data_provider=yahoo)
+        alphabet = Security.objects.create(symbol="GOOGL", name="Alphabet Inc.", data_provider=yahoo)
+
+        test_list_1 = Watchlist.objects.create(name="Test List", user=manager, visibility="USER")
 
         test_list_1.securities.add(apple)
         test_list_1.securities.add(microsoft)
 
-        test_list_2 = Watchlist.objects.create(name="Test List with google", user=manager, visibility="USER", data_provider=yahoo)
+        test_list_2 = Watchlist.objects.create(name="Test List with google", user=manager, visibility="USER")
 
         test_list_2.securities.add(apple)
         test_list_2.securities.add(microsoft)
@@ -45,38 +44,29 @@ class YahooYCL(TestCase):
 
     def test_historic_import(self):
 
-        yahoo_dp = DataProvider.objects.get(name="Yahoo")
-        dao = YahooOnlineDAO(yahoo_dp)
-
         watchlist = Watchlist.objects.get(name="Test List")
 
         for security in watchlist.securities.all():
-            result = dao.lookupHistory(security, interval=Interval.DAILY, look_back=10)
-            DailyData.objects.bulk_create(result)
+            result = self.dao.lookupHistory(security, interval=Interval.DAILY, look_back=10)
+            Daily.objects.bulk_create(result)
 
         for security in watchlist.securities.all():
-            daily = DailyData.objects.filter(security=security, data_provider=yahoo_dp).all()
+            daily = security.daily_data
             print(f"{security.symbol} daily has {daily.count()} entries")
 
 
     def test_read_quote_summary(self):
 
-        yahoo_dp = DataProvider.objects.get(name="Yahoo")
-        dao = YahooOnlineDAO(yahoo_dp)
-
-        result = dao.lookupSymbol("AAPL")
+        result = self.dao.lookupSymbol("AAPL")
         self.assertEqual(result["country"], "United States")
 
-        result = dao.lookupSymbol("AAPP")
+        result = self.dao.lookupSymbol("AAPP")
         self.assertEqual(result["error"], "Quote not found for ticker symbol: AAPP")
 
     def test_read_price(self):
 
-        yahoo_dp = DataProvider.objects.get(name="Yahoo")
-        dao = YahooOnlineDAO(yahoo_dp)
-    
-        result = dao.lookupPrice("AAPL")
+        result = self.dao.lookupPrice("AAPL")
         self.assertEqual(result["shortName"], "Apple Inc.")
 
-        result = dao.lookupPrice("AAPP")
+        result = self.dao.lookupPrice("AAPP")
         self.assertEqual(result["error"], "Quote not found for ticker symbol: AAPP")

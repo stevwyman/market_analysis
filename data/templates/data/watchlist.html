@@ -1,0 +1,14 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+watchlist
+
+<div class="container">
+    {% for security in securities %}
+        {{ security }}
+        <a href="{% url 'security' security.id %}">{{ security }}</a>
+    {% endfor %}
+</div>
+
+{% endblock %}

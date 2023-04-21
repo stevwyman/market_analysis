@@ -5,12 +5,10 @@ from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
 
-"""
-A User is required to assign roles and then to connect to to watchlists
-"""
-
-
 class User(AbstractUser):
+    """
+    A User is required to assign roles and then to connect to to watchlists
+    """
     MANAGER = 1
     PREMIUM = 2
     BASIC = 3
@@ -21,8 +19,16 @@ class User(AbstractUser):
         (BASIC, "Basic"),
     )
     role = models.PositiveSmallIntegerField(
-        choices=ROLE_CHOICES, blank=False, null=False
+        choices=ROLE_CHOICES, blank=False, null=False, default=BASIC
     )
+
+
+class DataProvider(models.Model):
+    name = models.CharField(max_length=24, null=False, blank=False)
+    description = models.TextField(null=True, blank=True)
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Security(models.Model):
@@ -30,6 +36,8 @@ class Security(models.Model):
     symbol = models.CharField(max_length=12, null=False, blank=False)
     wkn = models.CharField(max_length=12)
     isin = models.CharField(max_length=24)
+
+    data_provider = models.ForeignKey(DataProvider, on_delete=models.CASCADE)
 
     type  # stock, index, commodity, ...
 
@@ -43,10 +51,6 @@ class Security(models.Model):
 
     def __str__(self) -> str:
         return self.symbol
-
-
-class DataProvider(models.Model):
-    name = models.TextField(null=False, blank=False)
 
 
 class Watchlist(models.Model):
@@ -64,7 +68,6 @@ class Watchlist(models.Model):
 
     securities = models.ManyToManyField(Security, related_name="watchlists")
 
-    data_provider = models.ForeignKey(DataProvider, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -75,8 +78,7 @@ class Watchlist(models.Model):
             "id": self.id,
             "name": self.name,
             "user": self.user,
-            "visibility": self.visibility,
-            "data_provider": self.data_provider,
+            "visibility": self.visibility
         }
 
     class Meta:
@@ -87,10 +89,9 @@ class HistoricData(models.Model):
     security = models.ForeignKey(
         Security,
         on_delete=models.CASCADE,
-        related_name="%(app_label)s_%(class)s_ownership",
+        related_name="%(class)s_%(app_label)s",
     )
     date = models.DateField(null=False, blank=False)
-    data_provider = models.ForeignKey(DataProvider, on_delete=models.CASCADE)
     open_price = models.DecimalField(max_digits=16, decimal_places=6)
     high_price = models.DecimalField(max_digits=16, decimal_places=6)
     low = models.DecimalField(max_digits=16, decimal_places=6)
@@ -102,31 +103,31 @@ class HistoricData(models.Model):
         abstract = True
 
 
-class DailyData(HistoricData):
+class Daily(HistoricData):
     class Meta(HistoricData.Meta):
         constraints = [
             models.UniqueConstraint(
-                fields=["security", "data_provider", "date"],
-                name="unique_sec_provider_date_daily_combination",
+                fields=["security", "date"],
+                name="unique_sec_date_daily_combination",
             )
         ]
 
 
-class WeeklyData(HistoricData):
+class Weekly(HistoricData):
     class Meta(HistoricData.Meta):
         constraints = [
             models.UniqueConstraint(
-                fields=["security", "data_provider", "date"],
-                name="unique_sec_provider_date_weekly_combination",
+                fields=["security", "date"],
+                name="unique_sec_date_weekly_combination",
             )
         ]
 
 
-class MonthlyData(HistoricData):
+class Monthly(HistoricData):
     class Meta(HistoricData.Meta):
         constraints = [
             models.UniqueConstraint(
-                fields=["security", "data_provider", "date"],
-                name="unique_sec_provider_date_monthly_combination",
+                fields=["security", "date"],
+                name="unique_sec_date_monthly_combination",
             )
         ]

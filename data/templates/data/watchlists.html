@@ -1,0 +1,15 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+
+watchlists
+
+<div class="container">
+    {% for watchlist in watchlists %}
+        {{ watchlist }}
+        <a href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a>
+    {% endfor %}
+</div>
+
+{% endblock %}
