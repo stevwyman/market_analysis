@@ -4,8 +4,10 @@
 {% block body %}
 {{ security.name }}
 
-<div id="container" style="position:relative; height:80vh; width:160vw">
-    <canvas id="price-chart"></canvas>
+<div class="container">
+  <div class="row">
+    <div id="chart"></div>
+  </div>
 </div>
 
 <div>
@@ -13,28 +15,29 @@
 </div>
 
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
 <script>
 
-    var config = {
-      type: "line",
-      data: {
-        datasets: [{
-          data: {{ data|safe }},
-        }],
-        labels: {{ labels|safe }}
-      },
-      options: {
-        responsive: true
-      }
-    };
+  var options = {
+    chart: {
+      type: 'candlestick'
+    },
+    series: [{
+      data: 
+        {{ full_data|safe }}
+      
+    }],
+    xaxis: {
+          type: 'datetime'
+        }
 
-    window.onload = function() {
-        var ctx = document.getElementById('price-chart').getContext('2d');
-        window.myPie = new Chart(ctx, config);
-    };
+  }
 
-  </script>
+  var chart = new ApexCharts(document.querySelector("#chart"), options);
+  chart.render();
+
+</script>
 
 
 {% endblock %}
