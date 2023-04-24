@@ -51,6 +51,14 @@ class Security(models.Model):
 
     def __str__(self) -> str:
         return self.symbol
+    
+    class Meta():
+        constraints = [
+            models.UniqueConstraint(
+                fields=["symbol", "data_provider"],
+                name="unique_symbol_data_provider_combination",
+            )
+        ]
 
 
 class Watchlist(models.Model):
@@ -101,6 +109,7 @@ class HistoricData(models.Model):
 
     class Meta:
         abstract = True
+        ordering = ["-date"]
 
 
 class Daily(HistoricData):

@@ -7,9 +7,11 @@ watchlists
 
 <div class="container">
     {% for watchlist in watchlists %}
-        {{ watchlist }}
+    <div>
         <a href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a>
+    </div>
     {% endfor %}
+    <div><a href="{% url 'watchlist_new' %}">+</a></div>
 </div>
 
 {% endblock %}

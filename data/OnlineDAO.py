@@ -8,7 +8,7 @@ from enum import Enum
 from time import time
 from datetime import datetime, timedelta
 
-from data.models import Daily, Security
+from data.models import Daily, Security, DataProvider
 
 
 class Interval(Enum):
@@ -18,6 +18,13 @@ class Interval(Enum):
     MONTHLY = "1mo"
 
 
+class Online_DAO_Factory:
+    def get_online_dao(self, data_provider):
+        if data_provider.name == "Yahoo":
+            return YahooOnlineDAO()
+        else:
+            raise ValueError(format)
+
 class YahooOnlineDAO:
     def __init__(self) -> None:
         pass
@@ -26,7 +33,12 @@ class YahooOnlineDAO:
         """
         returns, if found, the "summaryProfile" data set
 
-        {"quoteSummary":{"result":[{"price":{"maxAge":1,"preMarketChangePercent":{"raw":-0.00954487,"fmt":"-0.95%"},"preMarketChange":{"raw":-1.60001,"fmt":"-1.60"},"preMarketTime":1681997399,"preMarketPrice":{"raw":166.03,"fmt":"166.03"},"preMarketSource":"FREE_REALTIME","postMarketChange":{},"postMarketPrice":{},"regularMarketChangePercent":{"raw":-0.0011931766,"fmt":"-0.12%"},"regularMarketChange":{"raw":-0.2000122,"fmt":"-0.20"},"regularMarketTime":1682013624,"priceHint":{"raw":2,"fmt":"2","longFmt":"2"},"regularMarketPrice":{"raw":167.43,"fmt":"167.43"},"regularMarketDayHigh":{"raw":167.87,"fmt":"167.87"},"regularMarketDayLow":{"raw":165.91,"fmt":"165.91"},"regularMarketVolume":{"raw":28145554,"fmt":"28.15M","longFmt":"28,145,554.00"},"averageDailyVolume10Day":{},"averageDailyVolume3Month":{},"regularMarketPreviousClose":{"raw":167.63,"fmt":"167.63"},"regularMarketSource":"FREE_REALTIME","regularMarketOpen":{"raw":166.09,"fmt":"166.09"},"strikePrice":{},"openInterest":{},"exchange":"NMS","exchangeName":"NasdaqGS","exchangeDataDelayedBy":0,"marketState":"REGULAR","quoteType":"EQUITY","symbol":"AAPL","underlyingSymbol":null,"shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price","currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
+        {"quoteSummary":
+            {"result":[
+                {"summaryProfile":
+                    {"address1":"One Apple Park Way","city":"Cupertino","state":"CA","zip":"95014","country":"United States","phone":"408 996 1010","website":"https://www.apple.com",
+                    "industry":"Consumer Electronics","sector":"Technology","longBusinessSummary":"Apple Inc. designs, ...","fullTimeEmployees":164000,"companyOfficers":[],"maxAge":86400}}],"error":null}}
+
         """
 
         http = urllib3.PoolManager()
@@ -133,7 +145,7 @@ class YahooOnlineDAO:
         reader = csv.DictReader(StringIO(data), delimiter=",")
         historic_entries = list()
         for row in reader:
-            print(row)
+            # print(row)
             date_str = row["Date"]
             open_str = row["Open"]
             high_str = row["High"]
@@ -143,15 +155,14 @@ class YahooOnlineDAO:
             volume_str = row["Volume"]
 
             entry = Daily(
-                date = datetime.strptime(date_str, "%Y-%m-%d").date(),
-                security = security,
-
-                open_price = decimal.Decimal(open_str),
-                high_price = decimal.Decimal(high_str),
-                low = decimal.Decimal(low_str),
-                close = decimal.Decimal(close_str),
-                adj_close = decimal.Decimal(close_adj_str),
-                volume = int(volume_str)
+                date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                security=security,
+                open_price=decimal.Decimal(open_str),
+                high_price=decimal.Decimal(high_str),
+                low=decimal.Decimal(low_str),
+                close=decimal.Decimal(close_str),
+                adj_close=decimal.Decimal(close_adj_str),
+                volume=int(volume_str),
             )
 
             historic_entries.append(entry)

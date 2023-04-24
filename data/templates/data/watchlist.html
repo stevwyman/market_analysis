@@ -2,13 +2,18 @@
 {% load static %}
 
 {% block body %}
-watchlist
+{{watchlist}}
 
 <div class="container">
     {% for security in securities %}
-        {{ security }}
-        <a href="{% url 'security' security.id %}">{{ security }}</a>
+        <div>
+            <a href="{% url 'security' security.id %}">{{ security }}</a>
+        </div>
     {% endfor %}
+</div>
+
+<div class="container">
+    <a href="{% url 'security_new' watchlist.id %}">+</a>
 </div>
 
 {% endblock %}

@@ -1,0 +1,7 @@
+<div class="container">
+    <form action="{% url 'watchlist_edit' watchlist.id %}" method="post"> 
+        {% csrf_token %}
+        {{ form.as_div }}
+        <button class="btn btn-primary" type="submit">edit</button>
+    </form>
+</div>
