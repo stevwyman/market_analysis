@@ -6,7 +6,7 @@ import decimal
 
 from enum import Enum
 from time import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from data.models import Daily, Security, DataProvider
 
@@ -144,10 +144,17 @@ class YahooOnlineDAO:
 
         reader = csv.DictReader(StringIO(data), delimiter=",")
         historic_entries = list()
+        today = date.today()
         for row in reader:
             # print(row)
             date_str = row["Date"]
+            # don't add today's value from history, use the price instead
+            if date_str == str(today):
+                continue
             open_str = row["Open"]
+            # some entries only have a date, but not a value i.e. bank holiday
+            if open_str == "null":
+                continue
             high_str = row["High"]
             low_str = row["Low"]
             close_adj_str = row["Adj Close"]

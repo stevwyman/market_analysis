@@ -1,10 +1,59 @@
-from django.test import TestCase
+from django.test import TestCase, Client
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
 from data.OnlineDAO import YahooOnlineDAO, Interval
 
 
 # Create your tests here.
+class WatchlistViews(TestCase):
+
+    def setUp(self) -> None:
+        yahoo = DataProvider.objects.create(name="Yahoo")
+        manager = User.objects.create(username = "Bernd", role=User.MANAGER)
+        return super().setUp()
+
+
+    def test_create_watchlist(self) -> None:
+
+        manager = User.objects.filter(username="Bernd").all()[0]
+
+        client = Client()
+        response = client.get("/data/watchlists")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["watchlists"]), 0)
+
+        response = client.get("/data/watchlist_new")
+        self.assertEqual(response.status_code, 200)
+
+        response = client.post("/data/watchlist_new", {"name":"test_name", "user":manager.pk, "visibility":"OU"}, follow=True)
+        self.assertEqual(len(response.context["watchlists"]), 1)
+
+    def test_add_security_to_watchlist(self) -> None:
+
+        manager = User.objects.filter(username="Bernd").all()[0]
+
+        client = Client()
+
+        response = client.post("/data/watchlist_new", {"name":"test_name", "user":manager.pk, "visibility":"OU"}, follow=True)
+        self.assertEqual(len(response.context["watchlists"]), 1)
+
+
+        response = client.get("/data/watchlists")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["watchlists"]), 1)
+
+        watchlist_id = response.context["watchlists"].first().pk
+        print(f"using watchlist id: {watchlist_id}")
+
+        response = client.get("/data/security_new/" + str(watchlist_id))
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.context["form"])
+        self.assertEqual(response.context["watchlist"].pk, watchlist_id)
+
+        response = client.post("/data/security_new/" + str(watchlist_id), {"symbol":"GS", "watchlist_id":watchlist_id}, follow=True) 
+        self.assertEqual(response.status_code, 200)
+
+        
 
 class YahooYCL(TestCase):
 

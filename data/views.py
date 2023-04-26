@@ -7,14 +7,10 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.utils.dateformat import format
 
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import matplotlib
-
-matplotlib.use("agg")
-
 from io import BytesIO
 from datetime import datetime
+from data.technical_analysis import EMA
+
 import base64
 
 from data.OnlineDAO import Online_DAO_Factory, Interval
@@ -23,6 +19,8 @@ from .forms import WatchlistForm, SecurityForm
 
 # Create your views here.
 
+RGB_RED = "rgba(255,82,82, 0.8)"
+RGB_GREEN = "rgba(0, 150, 136, 0.8)"
 
 # main page get's rendered here
 def index(request):
@@ -40,7 +38,14 @@ def watchlist_new(request):
         form = WatchlistForm()
         return render(request, "data/watchlist_new.html", {"form": form})
     else:
-        WatchlistForm(request.POST).save()
+        form = WatchlistForm(request.POST)
+        if form.is_valid:
+            form.save()
+            messages.info(request, "Created new watchlist")
+        else:
+            print(form.errors.as_data()) 
+            messages.error(request, "Could not create new watchlist")
+        
         return HttpResponseRedirect(reverse("watchlists"))
 
 
@@ -78,29 +83,55 @@ def security(request, security_id):
     print(f"data provider {sec.data_provider} for {sec}")
 
     # User.objects.all().order_by('-id')[:10]
-    daily = Daily.objects.filter(security=sec).all()[:200]
+    daily = Daily.objects.filter(security=sec).all()[:1000]
     daily_list = list(daily)
     daily_list.sort(key=lambda x: x.date, reverse=False)
 
-    closes = list()
-    dates = list()
-    full_data = list()
+    prices_data = list()
+    ema50_data = list()
+    ema50 = EMA(50)
+    volume_data = list()
 
+    previous_close = 0
     for entry in daily_list:
-        dates.append(str(entry.date))
-        closes.append(str(entry.close))
-        candle = list()
-        candle.append(int(format(entry.date, "U"))*1000)
-        candle.append(float(entry.open_price))
-        candle.append(float(entry.high_price))
-        candle.append(float(entry.low))
-        candle.append(float(entry.close))
-        full_data.append(candle)
+
+        # building the prices data using time and ohlc
+        candle = {}
+        candle["time"] = str(entry.date)
+        candle["open"] = float(entry.open_price)
+        candle["high"] = float(entry.high_price)
+        candle["low"] = float(entry.low)
+        candle["close"] = float(entry.close)
+        prices_data.append(candle)
+
+        ema50_value = ema50.add(float(entry.close))
+        if ema50_value is not None:
+            ema50_entry = {}
+            ema50_entry["time"] = str(entry.date)
+            ema50_entry["value"] = ema50_value
+            ema50_data.append(ema50_entry)
+
+        
+        volume = {}
+        volume["time"] = str(entry.date)
+        volume["value"] = float(entry.volume)
+        if candle["close"] >= previous_close:
+            volume["color"]= RGB_GREEN
+        else:
+            volume["color"] = RGB_RED
+        volume_data.append(volume)
+
+        previous_close = candle["close"]
 
     return render(
         request,
         "data/security.html",
-        {"security": sec, "labels": dates, "data": closes, "full_data": full_data},
+        {
+            "security": sec,
+            "full_data": prices_data,
+            "ema50": ema50_data,
+            "volume": volume_data,
+        },
     )
 
 
@@ -125,34 +156,37 @@ def security_new(request, watchlist_id):
             online_dao = Online_DAO_Factory().get_online_dao(dataProvider)
 
             price = online_dao.lookupPrice(symbol)
-            if price["error"] is None:
-                # create new Security
-                sec = Security(symbol=symbol, data_provider=dataProvider)
-                shortName = price["shortName"]
-                sec.name = shortName
-                currencySymbol = price["currencySymbol"]
-                sec.currency_symbol = currencySymbol
-                currency = price["currency"]
-                sec.currency = currency
-                quoteType = price["quoteType"]
-                # sec
-                exchangeName = price["exchangeName"]
-                sec.exchange = exchangeName
-            else:
+            print(price)
+            try:
                 messages.warning(request, price["error"])
                 return HttpResponseRedirect(
                     reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
                 )
+            except:
+                pass
+
+            # create new Security
+            sec = Security(symbol=symbol, data_provider=dataProvider)
+            shortName = price["shortName"]
+            sec.name = shortName
+            currencySymbol = price["currencySymbol"]
+            sec.currency_symbol = currencySymbol
+            currency = price["currency"]
+            sec.currency = currency
+            quoteType = price["quoteType"]
+            # sec
+            exchangeName = price["exchangeName"]
+            sec.exchange = exchangeName
 
             summaryProfile = online_dao.lookupSymbol(symbol)
-            if summaryProfile["error"] is None:
+            try:
                 country = summaryProfile["country"]
                 sec.country = country
                 industry = summaryProfile["industry"]
                 sec.industry = industry
                 sector = summaryProfile["sector"]
                 sec.sector = sector
-            else:
+            except:
                 messages.warning(request, summaryProfile["error"])
 
             sec.save()
@@ -162,7 +196,6 @@ def security_new(request, watchlist_id):
             print(form.errors.as_data())  # here you print errors to terminal
             messages.error(request, "Form is not valid")
 
-        # SecurityForm(request.POST).save()
         return HttpResponseRedirect(
             reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
         )

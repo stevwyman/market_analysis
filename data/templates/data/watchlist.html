@@ -2,8 +2,9 @@
 {% load static %}
 
 {% block body %}
-{{watchlist}}
-
+<section class="py-5 text-center container">
+    <h1>{{watchlist}}</h1>
+</section>
 <div class="container">
     {% for security in securities %}
         <div>
