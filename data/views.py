@@ -9,7 +9,7 @@ from django.utils.dateformat import format
 
 from io import BytesIO
 from datetime import datetime
-from data.technical_analysis import EMA
+from data.technical_analysis import EMA, SMA, Hurst
 
 import base64
 
@@ -91,7 +91,16 @@ def security(request, security_id):
     prices_data = list()
     ema50_data = list()
     ema50 = EMA(50)
+
+    ema20_data = list()
+    ema20 = EMA(20)
     volume_data = list()
+
+    hurst = Hurst()
+    hurst_data = list()
+
+    sma50 = SMA(50)
+    sma50_sd = 0
 
     previous_close = 0
     for entry in daily_list:
@@ -103,6 +112,10 @@ def security(request, security_id):
         candle["low"] = float(entry.low)
         candle["close"] = float(entry.close)
         prices_data.append(candle)
+        hurst_data.append(float(entry.close))
+
+        sma50.add(float(entry.close))
+        sma50_sd = sma50.sigma_delta
 
         ema50_value = ema50.add(float(entry.close))
         if ema50_value is not None:
@@ -110,6 +123,14 @@ def security(request, security_id):
             ema50_entry["time"] = str(entry.date)
             ema50_entry["value"] = ema50_value
             ema50_data.append(ema50_entry)
+
+        ema20_value = ema20.add(float(entry.close))
+        if ema20_value is not None:
+            ema20_entry = {}
+            ema20_entry["time"] = str(entry.date)
+            ema20_entry["value"] = ema20_value
+            ema20_data.append(ema20_entry)
+        
 
         volume = {}
         volume["time"] = str(entry.date)
@@ -122,6 +143,14 @@ def security(request, security_id):
 
         previous_close = candle["close"]
 
+    hurst_value = hurst.hurst(input_ts=hurst_data)
+    print(f"current hurst value: {hurst_value}")
+
+    # looking up additional information
+    online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+    price = online_dao.lookupPrice(sec.symbol)
+
+
     return render(
         request,
         "data/security.html",
@@ -129,7 +158,10 @@ def security(request, security_id):
             "security": sec,
             "full_data": prices_data,
             "ema50": ema50_data,
+            "ema20": ema20_data,
+            "sma50_sd": sma50_sd,
             "volume": volume_data,
+            "hurst_value": hurst_value
         },
     )
 

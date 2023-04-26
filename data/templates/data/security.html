@@ -14,7 +14,7 @@
   <div>
     <a href="{% url 'history_update' security.id %}">update daily</a>
   </div>
-  {{ security.sector }} {{ security.industry }}
+  sd: {{ sma50_sd|floatformat:2 }} | Hurst: {{ hurst_value|floatformat:2 }} | Sector: {{ security.sector }} | Industry: {{ security.industry }}
 </div>
 
 
@@ -75,6 +75,13 @@ var ema50 = chart.addLineSeries({
 var ema50values = {{ ema50|safe }}
 ema50.setData(ema50values);
 
+var ema20 = chart.addLineSeries({
+	color: 'rgba(4, 111, 232, 1)',
+	lineWidth: 1,
+});
+var ema20values = {{ ema20|safe }}
+ema20.setData(ema20values);
+
 var volumeSeries = chart.addHistogramSeries({
 	color: '#26a69a',
 	priceFormat: {
@@ -118,8 +125,11 @@ toolTip.style.left = 3 + 'px';
 toolTip.style.top = 3 + 'px';
 
 function setLastBarText() {
-	var dateStr = candles[candles.length - 1].time.year + '-' + candles[candles.length - 1].time.month.toString().padStart(2,'0') + '-' + 	candles[candles.length - 1].time.day.toString().padStart(2,'0');
-	 toolTip.innerHTML = '<div style="font-size: 22px; margin: 4px 0px; color: #20262E">' + candles[candles.length-1].close + '</div>' + '<div>' + dateStr + '</div>';
+	var currentBar = candles[candles.length - 1]
+	var currentBarTime = currentBar.time
+	var priceStr = (Math.round(currentBar.close * 100) / 100).toFixed(2)
+	var dateStr = currentBarTime.year + '-' + currentBarTime.month.toString().padStart(2,'0') + '-' + currentBarTime.day.toString().padStart(2,'0');
+	toolTip.innerHTML = '<div style="font-size: 22px; margin: 4px 0px; color: #20262E">' + '{{ security.currency_symbol }}' + " " + priceStr + '</div>' + '<div>' + dateStr + '</div>';
 }
 setLastBarText();
 
@@ -133,14 +143,15 @@ legend.style.left = 3 + 'px';
 legend.style.top = 3 + 'px';
 
 function setLegendText(priceValue) {
-	let val = '∅';
+	let val = (Math.round(ema50values[ema50values.length - 1].value * 100) / 100).toFixed(2);
 	if (priceValue !== undefined) {
 		val = (Math.round(priceValue * 100) / 100).toFixed(2);
 	}
 	legend.innerHTML = 'EMA(50) <span style="color:rgba(4, 111, 232, 1)">' + val + '</span>';
 }
 
-setLegendText(ema50values[ema50values.length - 1].value);
+setLegendText((Math.round(ema50values[ema50values.length - 1].value * 100) / 100).toFixed(2));
+
 
 chart.subscribeCrosshairMove((param) => {
 
