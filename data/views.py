@@ -22,6 +22,7 @@ from .forms import WatchlistForm, SecurityForm
 RGB_RED = "rgba(255,82,82, 0.8)"
 RGB_GREEN = "rgba(0, 150, 136, 0.8)"
 
+
 # main page get's rendered here
 def index(request):
     return render(request, "data/index.html")
@@ -43,9 +44,9 @@ def watchlist_new(request):
             form.save()
             messages.info(request, "Created new watchlist")
         else:
-            print(form.errors.as_data()) 
+            print(form.errors.as_data())
             messages.error(request, "Could not create new watchlist")
-        
+
         return HttpResponseRedirect(reverse("watchlists"))
 
 
@@ -94,7 +95,6 @@ def security(request, security_id):
 
     previous_close = 0
     for entry in daily_list:
-
         # building the prices data using time and ohlc
         candle = {}
         candle["time"] = str(entry.date)
@@ -111,12 +111,11 @@ def security(request, security_id):
             ema50_entry["value"] = ema50_value
             ema50_data.append(ema50_entry)
 
-        
         volume = {}
         volume["time"] = str(entry.date)
         volume["value"] = float(entry.volume)
         if candle["close"] >= previous_close:
-            volume["color"]= RGB_GREEN
+            volume["color"] = RGB_GREEN
         else:
             volume["color"] = RGB_RED
         volume_data.append(volume)
@@ -156,7 +155,7 @@ def security_new(request, watchlist_id):
             online_dao = Online_DAO_Factory().get_online_dao(dataProvider)
 
             price = online_dao.lookupPrice(symbol)
-            print(price)
+            # print(price)
             try:
                 messages.warning(request, price["error"])
                 return HttpResponseRedirect(

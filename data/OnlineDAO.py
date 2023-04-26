@@ -25,6 +25,7 @@ class Online_DAO_Factory:
         else:
             raise ValueError(format)
 
+
 class YahooOnlineDAO:
     def __init__(self) -> None:
         pass

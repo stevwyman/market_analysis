@@ -5,10 +5,12 @@ from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
 
+
 class User(AbstractUser):
     """
     A User is required to assign roles and then to connect to to watchlists
     """
+
     MANAGER = 1
     PREMIUM = 2
     BASIC = 3
@@ -51,8 +53,8 @@ class Security(models.Model):
 
     def __str__(self) -> str:
         return self.symbol
-    
-    class Meta():
+
+    class Meta:
         constraints = [
             models.UniqueConstraint(
                 fields=["symbol", "data_provider"],
@@ -86,7 +88,7 @@ class Watchlist(models.Model):
             "id": self.id,
             "name": self.name,
             "user": self.user,
-            "visibility": self.visibility
+            "visibility": self.visibility,
         }
 
     class Meta:
