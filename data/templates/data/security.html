@@ -6,6 +6,9 @@
 <section class="py-5 text-center container">
   <h1>{{ security.name }}</h1>
 </section>
+
+{% csrf_token %}
+
 <div class="container">
   <div class="row bg-light">
 	<div id="chartHeader"></div>
@@ -14,7 +17,18 @@
   <div>
     <a href="{% url 'history_update' security.id %}">update daily</a>
   </div>
-  sd: {{ sma50_sd|floatformat:2 }} | Hurst: {{ hurst_value|floatformat:2 }} | Sector: {{ security.sector }} | Industry: {{ security.industry }}
+
+  <div class="row">
+	<div>
+		<a href="#" onClick="show_tp('{{ security.id }}', 'sd')">MA50 Spread {{ sma50_sd|floatformat:2 }}</a>
+	</div>
+	<div>
+		<a href="#" onClick="show_tp('{{ security.id }}', 'hurst')">Hurst: {{ hurst_value|floatformat:2 }}</a>
+	</div>
+  </div>   | Hurst: {{ hurst_value|floatformat:2 }} | Sector: {{ security.sector }} | Industry: {{ security.industry }}
+  <div class="row">
+	<div id="tp_chart"></div>
+  </div>
 </div>
 
 

@@ -6,11 +6,30 @@
     <h1>{{watchlist}}</h1>
 </section>
 <div class="container">
-    {% for security in securities %}
+    
         <div>
-            <a href="{% url 'security' security.id %}">{{ security }}</a>
+            <table class="table table-hover">
+                <thead>
+                    <tr class="text-center">
+                        <th scope="col"></th>
+                        <th scope="col">SMA(50)</th>
+                        <th scope="col">spread</th>
+                        <th scope="col">Hurst</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for watchlist_entry in watchlist_entries %}
+                    <tr>
+                      <th scope="row"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.name }}</a></th>
+                      <td class="text-end">{{ watchlist_entry.sma.sma|floatformat:2 }}</td>
+                      <td class="text-end">{{ watchlist_entry.sma.sd|floatformat:2 }}</td>
+                      <td class="text-end">{{ watchlist_entry.sma.hurst|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table> 
         </div>
-    {% endfor %}
+    
 </div>
 
 <div class="container">

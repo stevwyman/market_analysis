@@ -12,6 +12,7 @@ from datetime import datetime
 from data.technical_analysis import EMA, SMA, Hurst
 
 import base64
+import json
 
 from data.OnlineDAO import Online_DAO_Factory, Interval
 from .models import Watchlist, Security, Daily, DataProvider
@@ -69,11 +70,24 @@ def watchlist(request, watchlist_id):
     print(f"id: {watchlist_id}")
 
     watchlist = Watchlist.objects.get(pk=watchlist_id)
-    securities = watchlist.securities.all()
+    securities = watchlist.securities.order_by("name").all()
+
+    watchlist_entries = list()
+    for security in securities:
+        watchlist_entry = {}
+        watchlist_entry["security"] = security
+        try:
+            history = security.daily_data.all()[:55]
+            watchlist_entry["sma"] = SMA(50).latest(history)
+        except ValueError as va:
+            messages.warning(request, va)
+
+        watchlist_entries.append(watchlist_entry)
+
     return render(
         request,
         "data/watchlist.html",
-        {"watchlist": watchlist, "securities": securities},
+        {"watchlist": watchlist, "securities": securities, "watchlist_entries":watchlist_entries}
     )
 
 
@@ -83,10 +97,7 @@ def security(request, security_id):
     sec = Security.objects.get(pk=security_id)
     print(f"data provider {sec.data_provider} for {sec}")
 
-    # User.objects.all().order_by('-id')[:10]
-    daily = Daily.objects.filter(security=sec).all()[:1000]
-    daily_list = list(daily)
-    daily_list.sort(key=lambda x: x.date, reverse=False)
+    daily = sec.daily_data.all()[:1000]
 
     prices_data = list()
     ema50_data = list()
@@ -103,7 +114,7 @@ def security(request, security_id):
     sma50_sd = 0
 
     previous_close = 0
-    for entry in daily_list:
+    for entry in reversed(daily):
         # building the prices data using time and ohlc
         candle = {}
         candle["time"] = str(entry.date)
@@ -178,11 +189,7 @@ def security_new(request, watchlist_id):
         if form.is_valid():
             symbol = form.cleaned_data["symbol"]
             dataProvider = form.cleaned_data["data_provider"]
-            print(f"looking up {symbol} with {dataProvider}")
-            # check if this security is already in the database
-            sec = Security.objects.filter(symbol=symbol, data_provider=dataProvider)
-            print(f"found :{sec}")
-
+            
             # looking up additional information
             online_dao = Online_DAO_Factory().get_online_dao(dataProvider)
 
@@ -223,6 +230,17 @@ def security_new(request, watchlist_id):
             sec.save()
             watchlist.securities.add(sec)
         else:
+            if "__all__" in form.errors:
+                error_data = form.errors["__all__"]
+                for e in error_data:
+                    if e == "Security with this Symbol and Data provider already exists.":
+                        sec = Security.objects.get(symbol=form.data["symbol"], data_provider=form.data["data_provider"])
+                        watchlist.securities.add(sec)
+                        messages.info(request, "Added " + str(sec) + " to watchlist")
+                        return HttpResponseRedirect(
+                            reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
+                        )
+
             print("form is not valid")
             print(form.errors.as_data())  # here you print errors to terminal
             messages.error(request, "Form is not valid")
@@ -248,3 +266,54 @@ def history_update(request, security_id):
 
     # forward to security overview page
     return HttpResponseRedirect(reverse("security", kwargs={"security_id": sec.id}))
+
+
+def technical_parameter(request, security_id):
+    sec = Security.objects.get(pk=security_id)
+
+    if request.method == "POST":
+
+        print(request.body)
+         
+        provided_data = json.loads(request.body)
+        print(f"technical parameter for {sec} requested")
+        
+        data = {}
+        if provided_data["view"] == "sd":
+            
+            daily = sec.daily_data.all()[:200]
+
+            hurst_data = list()
+            sma50 = SMA(50)
+
+            for entry in reversed(daily):
+
+                sma50.add(float(entry.close))
+                sd_value = sma50.sigma_delta()
+                if sd_value is not None:
+                    sd_entry = {}
+                    sd_entry['time'] = str(entry.date)
+                    sd_entry['value'] = sd_value
+                    hurst_data.append(sd_entry)
+
+            data["tp_data"] = json.dumps(hurst_data)
+        elif provided_data["view"] == "hurst":
+            daily = sec.daily_data.all()[:400]
+
+            hurst_data = list()
+            sma50 = SMA(50)
+
+            for entry in reversed(daily):
+
+                sma50.add(float(entry.close))
+                sd_value = sma50.sigma_delta()
+                if sd_value is not None:
+                    sd_entry = {}
+                    sd_entry['time'] = str(entry.date)
+                    sd_entry['value'] = sma50.hurst()
+                    hurst_data.append(sd_entry)
+
+            data["tp_data"] = json.dumps(hurst_data)
+        
+        return JsonResponse(data, status=201)
+

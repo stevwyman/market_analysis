@@ -1,6 +1,8 @@
 from typing import Optional
 from collections import deque
 from statistics import mean, stdev
+from data.models import HistoricData
+from django.db.models.query import QuerySet
 
 import numpy as np
 
@@ -29,6 +31,7 @@ class EMA(MovingAverage):
     def __init__(self, length: int):
         super().__init__(length)
 
+        self.__length = length
         self.__factor = float(2 / (1 + length))
         self.__ema = 0.0
         self.__ema_reached = False
@@ -55,17 +58,20 @@ class EMA(MovingAverage):
                 self.__ema = mean(self._queue)
             return None
     
+
     def sigma_delta(self) -> Optional[float]:
 
         if self.__ema_reached:
             return (self.__value - self.__ema) / stdev(self._queue)
         return None
     
+
     
 class SMA(MovingAverage):
     def __init__(self, length: int):
         super().__init__(length)
 
+        self.__length = length
         self.__sma = 0.0
 
     def add(self, value: float) -> float:
@@ -86,6 +92,35 @@ class SMA(MovingAverage):
         else:
             return None
         
+    def hurst(self) -> Optional[float]:
+        
+        if len(self._queue) == self._length:
+            hurst = Hurst()
+            hurst_value = hurst.hurst(list(self._queue))
+            return hurst_value
+        else:
+            return None
+
+    
+    def latest(self, history: QuerySet[HistoricData]) -> dict:
+
+        if history.count() > self.__length:
+            data = {}
+            r_history = list()
+            for entry in reversed(history):
+                self.add(float(entry.close))
+                r_history.append(float(entry.close))
+                # print(f"{entry.date} {entry.close}")
+            data["sma"] = self.__sma
+            data["sd"] = self.sigma_delta
+            data["length"] = self.__length
+            hurst = Hurst()
+            data["hurst"] = hurst.hurst(r_history)
+            
+            return data
+        else: 
+            raise ValueError("History size not sufficient.")
+
 
 class Hurst():
 

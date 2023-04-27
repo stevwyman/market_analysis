@@ -109,6 +109,9 @@ class HistoricData(models.Model):
     adj_close = models.DecimalField(max_digits=16, decimal_places=6)
     volume = models.PositiveIntegerField()
 
+    def __str__(self):
+        return self.security.name + " " + str(self.date) + " " + str(self.close)
+
     class Meta:
         abstract = True
         ordering = ["-date"]

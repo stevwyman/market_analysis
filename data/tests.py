@@ -79,6 +79,29 @@ class WatchlistViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["securities"]), 1)
 
+    def test_technical_parameter(self) -> None:
+        yahoo = DataProvider.objects.create(name="Yahoo")
+        manager = User.objects.create(role=User.MANAGER)
+
+        apple = Security.objects.create(
+            symbol="AAPL", name="Apple Inc.", data_provider=yahoo
+        )
+
+        dao = YahooOnlineDAO()
+        self.assertIsNotNone(dao)
+        daily_history = dao.lookupHistory(
+                apple, interval=Interval.DAILY, look_back=1000
+            )
+        self.assertIsNotNone(daily_history)
+        Daily.objects.bulk_create(daily_history)
+
+        history = apple.daily_data.all()
+        self.assertIsNotNone(history)
+
+        client = Client(enforce_csrf_checks=True)
+        response = client.post("/data/tp/" + str(apple.pk), data={"view": "sd"})
+        self.assertEqual(response.status_code, 403) ## TODO csrf test
+        print(response)
 
 class YahooYCL(TestCase):
     dao = YahooOnlineDAO()
