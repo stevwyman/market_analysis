@@ -1,3 +1,4 @@
 django
 django-bootstrap5
 urllib3
+numpy
