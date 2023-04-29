@@ -37,7 +37,7 @@ function show_tp(security_id, parameter){
 
 
 function generate_tp_chart(data){
-    var width = 900;
+    var width = 720;
     var height = 450;
 
     document.querySelector("#tp_chart").innerHTML = ''

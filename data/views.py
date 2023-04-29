@@ -1,22 +1,23 @@
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger, Page
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import DatabaseError, transaction
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.utils.dateformat import format
 
-from io import BytesIO
-from datetime import datetime
+from datetime import datetime, date
 from data.technical_analysis import EMA, SMA, Hurst
 
-import base64
 import json
 
 from data.OnlineDAO import Online_DAO_Factory, Interval
-from .models import Watchlist, Security, Daily, DataProvider
+from .models import Watchlist, Security, Daily, DailyUpdate, DataProvider
 from .forms import WatchlistForm, SecurityForm
+from .helper import humanize_price
 
 # Create your views here.
 
@@ -66,16 +67,18 @@ def watchlist_edit(request, watchlist_id):
         return HttpResponseRedirect(reverse("watchlists"))
 
 
-def watchlist(request, watchlist_id):
-    print(f"id: {watchlist_id}")
+def watchlist(request, watchlist_id:int):
 
     watchlist = Watchlist.objects.get(pk=watchlist_id)
     securities = watchlist.securities.order_by("name").all()
 
+    # building watchlist
     watchlist_entries = list()
     for security in securities:
         watchlist_entry = {}
         watchlist_entry["security"] = security
+        price_dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+        watchlist_entry["price"] = humanize_price(price_dao.lookupPrice(security.symbol))
         try:
             history = security.daily_data.all()[:55]
             watchlist_entry["sma"] = SMA(50).latest(history)
@@ -84,10 +87,39 @@ def watchlist(request, watchlist_id):
 
         watchlist_entries.append(watchlist_entry)
 
+
+    # sorting
+    order_by = request.GET.get("order_by", "name")
+    direction = request.GET.get("direction", "asc")
+    if direction == "desc":
+        _b_direction = True
+    else:
+        _b_direction = False
+    print(f"sorting {direction} by {order_by}")
+    if order_by == "change":
+        watchlist_entries.sort(key=lambda x: x["price"]["change_percent"], reverse=_b_direction)
+    elif order_by == "hurst":
+        watchlist_entries.sort(key=lambda x: x["sma"]["hurst"], reverse=_b_direction)
+    elif order_by == "spread":
+        watchlist_entries.sort(key=lambda x: x["sma"]["sd"], reverse=_b_direction)
+
+    # pagination
+    paginator = Paginator(watchlist_entries, 10)
+    page_num = request.GET.get("page", 1)
+
+    try:
+        paged_watchlist_entries = paginator.page(page_num)
+    except PageNotAnInteger:
+        # if page is not an integer, deliver the first page
+        paged_watchlist_entries = paginator.page(1)
+    except EmptyPage:
+        # if the page is out of range, deliver the last page
+        paged_watchlist_entries = paginator.page(paginator.num_pages)
+
     return render(
         request,
         "data/watchlist.html",
-        {"watchlist": watchlist, "securities": securities, "watchlist_entries":watchlist_entries}
+        {"watchlist": watchlist, "watchlist_entries":paged_watchlist_entries, "order_by": order_by, "direction": direction}
     )
 
 
@@ -161,6 +193,11 @@ def security(request, security_id):
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
     price = online_dao.lookupPrice(sec.symbol)
 
+    if price["quoteType"] == "EQUITY":
+        defaultKeyStatistics = online_dao.lookupDefaultKeyStatistics(sec.symbol)
+    else:
+        defaultKeyStatistics = {}
+
 
     return render(
         request,
@@ -172,7 +209,10 @@ def security(request, security_id):
             "ema20": ema20_data,
             "sma50_sd": sma50_sd,
             "volume": volume_data,
-            "hurst_value": hurst_value
+            "hurst_value": hurst_value,
+            "price":humanize_price(price),
+            "price_orig":price,
+            "defaultKeyStatistics":defaultKeyStatistics
         },
     )
 
@@ -229,6 +269,34 @@ def security_new(request, watchlist_id):
 
             sec.save()
             watchlist.securities.add(sec)
+
+            #
+            # add initial history for this entry
+            #
+            online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+
+            # request new history from online dao
+            result = online_dao.lookupHistory(security=sec, look_back=2000)
+            if len(result) > 10:
+
+                try:
+                    with transaction.atomic():
+                        # drop current history
+                        Daily.objects.filter(security=sec).delete()
+                        try:
+                            DailyUpdate.objects.get(security=sec).delete()
+                        except:
+                            pass
+
+                        # crate new history
+                        Daily.objects.bulk_create(result)
+                        DailyUpdate.objects.create(security=sec)
+                        messages.info(request, "History has been updated")
+
+                except DatabaseError as db_error:
+                    print(db_error)
+                    messages.warning(request, "Error while updating")
+
         else:
             if "__all__" in form.errors:
                 error_data = form.errors["__all__"]
@@ -250,19 +318,67 @@ def security_new(request, watchlist_id):
         )
 
 
+def security_drop(request, watchlist_id):
+    """
+    remove the security from the given watchlist and if no other holds a reference, drop the security and the elated data
+    """    
+    watchlist = Watchlist.objects.get(pk=watchlist_id)
+    if request.method == "POST":
+
+        print(request.body)
+        request.POST.get("security_id", "")
+        # provided_data = json.loads(request.body)
+        
+        security_id = request.POST.get("security_id", "")
+        security = Security.objects.get(pk=security_id)
+        watchlist.securities.remove(security)
+
+        related_watchlists = security.watchlists.all()
+        if related_watchlists.count() == 0:
+            security.delete()
+            print(f"removed {security_id}")
+    return HttpResponseRedirect(
+            reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
+        )  
+        
+
 def history_update(request, security_id):
+
     sec = Security.objects.get(pk=security_id)
+    _today = date.today()
+
+    last_updated = sec.dailyupdate_data.all().first()
+    if last_updated is not None:
+        print(f"last update: {last_updated.date}")
+        if last_updated.date == _today:
+            print("no update required, already updated today")
+            messages.info(request, "Already up to date.")
+            # forward to security overview page
+            return HttpResponseRedirect(reverse("security", kwargs={"security_id": sec.id}))
+
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
 
     # request new history from online dao
     result = online_dao.lookupHistory(security=sec, look_back=2000)
     if len(result) > 10:
-        # drop current history
-        Daily.objects.filter(security=sec).delete()
-        messages.info(request, "old history dropped")
-        # crate new history
-        Daily.objects.bulk_create(result)
-        messages.info(request, "new history created")
+
+        try:
+            with transaction.atomic():
+                # drop current history
+                Daily.objects.filter(security=sec).delete()
+                try:
+                    DailyUpdate.objects.get(security=sec).delete()
+                except:
+                    pass
+
+                # crate new history
+                Daily.objects.bulk_create(result)
+                DailyUpdate.objects.create(security=sec)
+                messages.info(request, "History has been updated")
+
+        except DatabaseError as db_error:
+            print(db_error)
+            messages.warning(request, "Error while updating")
 
     # forward to security overview page
     return HttpResponseRedirect(reverse("security", kwargs={"security_id": sec.id}))

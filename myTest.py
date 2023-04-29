@@ -1,9 +1,9 @@
-from data.OnlineDAO import YahooOnlineDAO, Interval
+from data.OnlineDAO import YahooDAO, Interval
 from io import StringIO
 import csv
 
 
-online_dao = YahooOnlineDAO()
+online_dao = YahooDAO()
 
 # print(online_dao.lookupSymbol("AAPL"))
 

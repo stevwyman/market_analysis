@@ -112,7 +112,7 @@ class SMA(MovingAverage):
                 r_history.append(float(entry.close))
                 # print(f"{entry.date} {entry.close}")
             data["sma"] = self.__sma
-            data["sd"] = self.sigma_delta
+            data["sd"] = self.sigma_delta()
             data["length"] = self.__length
             hurst = Hurst()
             data["hurst"] = hurst.hurst(r_history)

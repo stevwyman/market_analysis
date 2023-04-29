@@ -1,0 +1,35 @@
+<nav aria-label="...">
+    <ul class="pagination">
+      {% if watchlist_entries.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ watchlist_entries.previous_page_number }}&order_by={{ order_by }}&direction={{ direction }}">Previous</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">Previous</span>
+      </li>
+      {% endif %}
+
+      {% for wle_object in watchlist_entries.paginator %}
+      {% if watchlist_entries.number == wle_object.number %}
+      <li class="page-item active" aria-current="page">
+        <span class="page-link">{{ wle_object.number }}</span>
+      </li>
+      {% else %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ wle_object.number }}&order_by={{ order_by }}&direction={{ direction }}">{{ wle_object.number }}</a>
+      </li>
+      {% endif %}
+      {% endfor %}
+        
+      {% if watchlist_entries.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ watchlist_entries.next_page_number }}&order_by={{ order_by }}&direction={{ direction }}">Next</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled">
+        <span class="page-link">Next</span>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>

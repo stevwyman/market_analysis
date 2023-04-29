@@ -7,12 +7,8 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         {% load django_bootstrap5 %}
-
         {% bootstrap_css %}
-
         {% bootstrap_javascript %}
-
-        {% bootstrap_messages %}
         <link href="{% static 'data/styles.css' %}" rel="stylesheet">
         <script src="{% static 'data/script.js' %}"></script>
     </head>
@@ -33,18 +29,15 @@
                         <li class="nav-item">
                             <a class="nav-link active" aria-current="page" href="#">Home</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'watchlists' %}">Watchlists</a>
-                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Link
+                                Watchlists
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#">Action</a></li>
-                                <li><a class="dropdown-item" href="#">Another action</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="#">Something else here</a></li>
+                                {% for watchlist in watchlists %}
+                                <li><a class="dropdown-item" href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a></li>
+                                {% endfor %}
+                                <li><a class="dropdown-item" href="{% url 'watchlist_new' %}">+</a></li>
                             </ul>
                         </li>
                         <li class="nav-item">
@@ -58,6 +51,8 @@
                 </div>
             </div>
         </nav>
+
+        {% bootstrap_messages %}
 
         <main>
             {% block body %}

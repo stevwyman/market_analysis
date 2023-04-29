@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.contrib.messages import get_messages
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
-from data.OnlineDAO import YahooOnlineDAO, Interval
+from data.OnlineDAO import YahooDAO, Interval
 
 
 # Create your tests here.
@@ -87,7 +87,7 @@ class WatchlistViews(TestCase):
             symbol="AAPL", name="Apple Inc.", data_provider=yahoo
         )
 
-        dao = YahooOnlineDAO()
+        dao = YahooDAO()
         self.assertIsNotNone(dao)
         daily_history = dao.lookupHistory(
                 apple, interval=Interval.DAILY, look_back=1000
@@ -104,7 +104,7 @@ class WatchlistViews(TestCase):
         print(response)
 
 class YahooYCL(TestCase):
-    dao = YahooOnlineDAO()
+    dao = YahooDAO()
 
     def setUp(self) -> None:
         yahoo = DataProvider.objects.create(name="Yahoo")

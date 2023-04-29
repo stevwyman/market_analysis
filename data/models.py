@@ -117,12 +117,34 @@ class HistoricData(models.Model):
         ordering = ["-date"]
 
 
+class HistoryLastUpdate(models.Model):
+    security = models.ForeignKey(
+        Security,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_%(app_label)s",
+    )
+
+    date = models.DateField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        ordering = ["security"]
+
+
 class Daily(HistoricData):
     class Meta(HistoricData.Meta):
         constraints = [
             models.UniqueConstraint(
-                fields=["security", "date"],
-                name="unique_sec_date_daily_combination",
+                fields=["security", "date"], name="unique_sec_date_daily_combination"
+            )
+        ]
+
+
+class DailyUpdate(HistoryLastUpdate):
+    class Meta(HistoryLastUpdate.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["security", "date"], name="unique_sec_update_daily_combination"
             )
         ]
 
@@ -137,11 +159,30 @@ class Weekly(HistoricData):
         ]
 
 
+class WeeklyUpdate(HistoryLastUpdate):
+    class Meta(HistoryLastUpdate.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["security", "date"], name="unique_sec_update_weekly_combination"
+            )
+        ]
+
+
 class Monthly(HistoricData):
     class Meta(HistoricData.Meta):
         constraints = [
             models.UniqueConstraint(
                 fields=["security", "date"],
                 name="unique_sec_date_monthly_combination",
+            )
+        ]
+
+
+class MonthlyUpdate(HistoryLastUpdate):
+    class Meta(HistoryLastUpdate.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                fields=["security", "date"],
+                name="unique_sec_update_monthly_combination",
             )
         ]

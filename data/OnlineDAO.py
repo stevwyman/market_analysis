@@ -4,6 +4,12 @@ import urllib3
 from io import StringIO
 import decimal
 
+import pymongo
+import configparser
+
+from django.conf import settings
+
+
 from enum import Enum
 from time import time
 from datetime import date, datetime, timedelta
@@ -21,14 +27,25 @@ class Interval(Enum):
 class Online_DAO_Factory:
     def get_online_dao(self, data_provider):
         if data_provider.name == "Yahoo":
-            return YahooOnlineDAO()
+            return YahooDAO()
         else:
             raise ValueError(format)
 
 
-class YahooOnlineDAO:
+class YahooDAO:
+    
     def __init__(self) -> None:
-        pass
+        config = configparser.ConfigParser()
+        config.read("config.ini")
+        self._client = pymongo.MongoClient(config.get("DB","url"))
+        try:
+            self._client.server_info()
+        except pymongo.errors.ServerSelectionTimeoutError:
+            exit("Mongo instance not reachable.")
+
+        self._db = self._client[config.get("DB","db")]
+        self._collection_price = self._db[config.get("DB.YAHOO.PRICE","collection")]
+        self._collection_dks = self._db[config.get("DB.YAHOO.DKS","collection")]
 
     def lookupSymbol(self, symbol) -> dict:
         """
@@ -91,6 +108,27 @@ class YahooOnlineDAO:
                     "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
         """
 
+        try:
+            # check if we have a price entry in the mongo-db
+            price = self._collection_price.find_one({"symbol": symbol})
+            if price is None:
+                print(f"no price object for {symbol}")
+            else:
+                # check if the available entry is older than 5 minutes
+                entry_ts = price["timestamp"]
+                current_ts = datetime.now().timestamp()
+
+                # if entry_ts + 300 > current_ts:   # for production 5 minutes
+                if entry_ts + 3600 > current_ts:  # for testing 1 hour
+                    # print(f"serving price for {symbol} from db")
+                    return price["price"]
+                else:
+                    print(f"need to refresh the price in the database")
+
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print("Could not write data to locale storage: ", e)
+
+
         http = urllib3.PoolManager()
         r = http.request(
             "GET",
@@ -103,13 +141,16 @@ class YahooOnlineDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-
+        print(f"status for requesting 'price' of {symbol}: {r.status}")
         summary_profile = json.loads(r.data.decode("utf-8"))
 
-        print(f"status for requesting 'price' of {symbol}: {r.status}")
+        price = summary_profile["quoteSummary"]["result"][0]["price"]
+
+        upsertable_data = {"timestamp":datetime.now().timestamp(), "price":price}
+        self._collection_price.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
 
         if r.status == 200:
-            return summary_profile["quoteSummary"]["result"][0]["price"]
+            return price
         else:
             error = summary_profile["quoteSummary"]["error"]
             return {"error": error["description"]}
@@ -176,3 +217,55 @@ class YahooOnlineDAO:
             historic_entries.append(entry)
 
         return historic_entries
+
+    def lookupDefaultKeyStatistics(self, symbol) -> dict:
+        """
+        returns, if found, the "defaultKeyStatistics" data set
+
+        """
+
+        try:
+            # check if we have a price entry in the mongo-db
+            defaultKeyStatistics = self._collection_dks.find_one({"symbol": symbol})
+            if defaultKeyStatistics is None:
+                print(f"no price object for {symbol}")
+            else:
+                # check if the available entry is older than 5 minutes
+                entry_ts = defaultKeyStatistics["timestamp"]
+                current_ts = datetime.now().timestamp()
+
+                # if entry_ts + 300 > current_ts:   # for production 5 minutes
+                if entry_ts + 3600 > current_ts:  # for testing 1 hour
+                    # print(f"serving price for {symbol} from db")
+                    return defaultKeyStatistics["defaultKeyStatistics"]
+                else:
+                    print(f"need to refresh the price in the database")
+
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print("Could not write data to locale storage: ", e)
+
+
+        http = urllib3.PoolManager()
+        r = http.request(
+            "GET",
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
+            fields={
+                "formatted": "true",
+                "lang": "en-US",
+                "region": "US",
+                "modules": "defaultKeyStatistics",
+                "corsDomain": "finance.yahoo.com",
+            },
+        )
+        print(f"status for requesting 'price' of {symbol}: {r.status}")
+        summary_profile = json.loads(r.data.decode("utf-8"))
+
+        if r.status == 200:
+            defaultKeyStatistics = summary_profile["quoteSummary"]["result"][0]["defaultKeyStatistics"]
+
+            upsertable_data = {"timestamp":datetime.now().timestamp(), "defaultKeyStatistics":defaultKeyStatistics}
+            self._collection_price.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            return defaultKeyStatistics
+        else:
+            error = summary_profile["quoteSummary"]["error"]
+            return {"error": error["description"]}
