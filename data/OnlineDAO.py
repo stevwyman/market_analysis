@@ -9,13 +9,11 @@ import configparser
 
 from django.conf import settings
 
-
 from enum import Enum
 from time import time
 from datetime import date, datetime, timedelta
 
-from data.models import Daily, Security, DataProvider
-
+from data.models import Daily, Security
 
 class Interval(Enum):
     HOURLY = "1h"
@@ -144,12 +142,11 @@ class YahooDAO:
         print(f"status for requesting 'price' of {symbol}: {r.status}")
         summary_profile = json.loads(r.data.decode("utf-8"))
 
-        price = summary_profile["quoteSummary"]["result"][0]["price"]
-
-        upsertable_data = {"timestamp":datetime.now().timestamp(), "price":price}
-        self._collection_price.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
-
         if r.status == 200:
+            price = summary_profile["quoteSummary"]["result"][0]["price"]
+
+            upsertable_data = {"timestamp":datetime.now().timestamp(), "price":price}
+            self._collection_price.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
             return price
         else:
             error = summary_profile["quoteSummary"]["error"]
@@ -221,7 +218,6 @@ class YahooDAO:
     def lookupDefaultKeyStatistics(self, symbol) -> dict:
         """
         returns, if found, the "defaultKeyStatistics" data set
-
         """
 
         try:
@@ -234,12 +230,11 @@ class YahooDAO:
                 entry_ts = defaultKeyStatistics["timestamp"]
                 current_ts = datetime.now().timestamp()
 
-                # if entry_ts + 300 > current_ts:   # for production 5 minutes
-                if entry_ts + 3600 > current_ts:  # for testing 1 hour
-                    # print(f"serving price for {symbol} from db")
+                if entry_ts + 86400 > current_ts:  # for testing 1 day
+                    print(f"serving 'defaultKeyStatistics' for {symbol} from db")
                     return defaultKeyStatistics["defaultKeyStatistics"]
                 else:
-                    print(f"need to refresh the price in the database")
+                    print(f"need to refresh the 'defaultKeyStatistics' in the database")
 
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
@@ -257,14 +252,14 @@ class YahooDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-        print(f"status for requesting 'price' of {symbol}: {r.status}")
+        print(f"status for requesting 'defaultKeyStatistics' of {symbol}: {r.status}")
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
             defaultKeyStatistics = summary_profile["quoteSummary"]["result"][0]["defaultKeyStatistics"]
 
             upsertable_data = {"timestamp":datetime.now().timestamp(), "defaultKeyStatistics":defaultKeyStatistics}
-            self._collection_price.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            self._collection_dks.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
             return defaultKeyStatistics
         else:
             error = summary_profile["quoteSummary"]["error"]

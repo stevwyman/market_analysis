@@ -77,7 +77,7 @@ class WatchlistViews(TestCase):
             follow=True,
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context["securities"]), 1)
+        self.assertEqual(len(response.context["watchlist_entries"]), 1)
 
     def test_technical_parameter(self) -> None:
         yahoo = DataProvider.objects.create(name="Yahoo")

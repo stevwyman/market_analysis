@@ -5,11 +5,9 @@
 
 <section class="py-5 text-center container">
   <h1>{{ security.name }}</h1>
-  <div>
-	<p>{% load humanize %}
-		{{ price.local_timestamp|naturaltime }} {{ price.currency_symbol }}&nbsp;{{ price.price }} {{ price.change_percent|floatformat:2 }}% ({{ price.change|floatformat:2 }})
-	</p>
-  </div>
+  <span class="fs-2 ms-2">{{ price.currency_symbol }}&nbsp;{{ price.price|floatformat:2 }}</span>
+  <span class="fs-4 ms-2 {% if price.change > 0 %} text-success fw-light {% else %} text-danger {% endif %}">{{ price.change|floatformat:2 }}&nbsp;({{ price.change_percent|floatformat:2 }}%)</span>
+  <span class="fs-6 ms-2 fw-light">{% load humanize %}{{ price.local_timestamp|naturaltime }}</span>
 </section>
 
 {% csrf_token %}
@@ -49,13 +47,32 @@
 				  </ul>
 			</div>
 			<div>
-				<p>forwardPE: {{ defaultKeyStatistics.forwardPE.raw|floatformat:2}}</p>
-				<p>pegRatio: {{ defaultKeyStatistics.pegRatio.raw|floatformat:2}}</p>
-				<p>enterpriseToRevenue: {{ defaultKeyStatistics.enterpriseToRevenue.raw|floatformat:2}}</p>
-				<p>enterpriseToEbitda: {{ defaultKeyStatistics.enterpriseToEbitda.raw|floatformat:2}}</p>
+				{% if not defaultKeyStatistics.vars %}
+				not defaultKeyStatistics
+				{% endif %}
 
-				<p>shortPercentOfFloat: {{ defaultKeyStatistics.shortPercentOfFloat.fmt}}</p>
-				<p>dateShortInterest: {{ defaultKeyStatistics.dateShortInterest.fmt}}</p>
+				<table class="table">
+					<tr>
+						<td>PE<sub>forward</sub></td>
+						<td>{{ defaultKeyStatistics.forwardPE.raw|floatformat:2 }}</td>
+					</tr>
+					<tr>
+						<td>PEG</td>
+						<td>{{ defaultKeyStatistics.pegRatio.raw|floatformat:2 }}</td>
+					</tr>
+					<tr>
+						<td>EV/rev</td>
+						<td>{{ defaultKeyStatistics.enterpriseToRevenue.raw|floatformat:2 }}</td>
+					</tr>
+					<tr>
+						<td>EV/Ebitda</td>
+						<td>{{ defaultKeyStatistics.enterpriseToEbitda.raw|floatformat:2 }}</td>
+					</tr>
+					<tr>
+						<td>Short/Float<br><small>{{ defaultKeyStatistics.dateShortInterest.fmt }}</small></td>
+						<td>{{ defaultKeyStatistics.shortPercentOfFloat.fmt }}</td>
+					</tr>
+				</table>
 				
 			</div>
 		</div>
@@ -169,10 +186,10 @@ chart.priceScale('').applyOptions({
 });
 
 var candleSeries = chart.addCandlestickSeries({
-  upColor: '#fff',
-  downColor: '#F8961E',
-  borderDownColor: '#F94144',
-  borderUpColor: '#43AA8B',
+  upColor: 'rgba(0, 150, 136, 0.8)',
+  downColor: 'rgba(255,82,82, 0.8)',
+  borderDownColor: '#dc3545',
+  borderUpColor: '#198754',
   wickDownColor: 'rgba(255, 144, 0, 1)',
   wickUpColor: 'rgba(255, 144, 0, 1)',
 });
