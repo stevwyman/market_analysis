@@ -19,16 +19,19 @@
 			<div class="py-2">
 				<ul class="nav nav-tabs">
 					<li class="nav-item">
-					  <a class="nav-link active" aria-current="page" href="#">Active</a>
+						<a class="nav-link" id="nl_daily" onClick="show_history('{{ security.id }}', 'd')" href="#">Daily</a>
 					</li>
 					<li class="nav-item">
-					  <a class="nav-link" href="#">Link</a>
+						<a class="nav-link" id="nl_weekly" onClick="show_history('{{ security.id }}', 'w')" href="#">Weekly</a>
 					</li>
 					<li class="nav-item">
-					  <a class="nav-link" href="#">Link</a>
+						<a class="nav-link" id="nl_monthly" onClick="show_history('{{ security.id }}', 'm')" href="#">Monthly</a>
 					</li>
 					<li class="nav-item">
-					  <a class="nav-link disabled" href="#" tabindex="-1" aria-disabled="true">Disabled</a>
+						<a class="nav-link" id="nl_hurst" onClick="show_tp('{{ security.id }}', 'hurst')" href="#">Hurst</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" id="nl_sd" onClick="show_tp('{{ security.id }}', 'sd')" href="#">SD</a>
 					</li>
 				  </ul>
 			</div>
@@ -78,23 +81,18 @@
 		</div>
 		
 	</div>
-  
-
-
-  <div class="row bg-light py-5">
-	<div>
-		<a href="{% url 'history_update' security.id %}">update daily</a>
-	  </div>
-	<div>
-		<a href="#" onClick="show_tp('{{ security.id }}', 'sd')">MA50 Spread {{ sma50_sd|floatformat:2 }}</a>
+	
+  	<div class="row bg-light py-5">
+		<div>
+			<a href="{% url 'history_update' security.id %}?interval=1d">update daily</a>
+	  	</div>
+		<div>
+			<a href="{% url 'history_update' security.id %}?interval=1w">update weekly</a>
+	  	</div>
+		<div>
+			<a href="{% url 'history_update' security.id %}?interval=1mo">update monthly</a>
+	  	</div>
 	</div>
-	<div>
-		<a href="#" onClick="show_tp('{{ security.id }}', 'hurst')">Hurst: {{ hurst_value|floatformat:2 }}</a>
-	</div>
-  </div>   | Hurst: {{ hurst_value|floatformat:2 }} | Sector: {{ security.sector }} | Industry: {{ security.industry }}
-  <div class="row">
-	<div id="tp_chart"></div>
-  </div>
 </div>
 
 <div class="container">
@@ -113,155 +111,7 @@
 <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
 <script>
-
-var width = 800;
-var height = 450;
-
-var chart = LightweightCharts.createChart(document.querySelector("#chartContainer"), {
-	width: width,
-  	height: height,
-	layout: {
-		background: {
-            type: 'solid',
-            color: '#ffffff',
-        },
-		textColor: 'rgba(47, 79, 79, 0.9)',
-	},
-	grid: {
-		vertLines: {
-			color: 'rgba(197, 203, 206, 0.5)',
-		},
-		horzLines: {
-			color: 'rgba(197, 203, 206, 0.5)',
-		},
-	},
-	crosshair: {
-		mode: LightweightCharts.CrosshairMode.Normal,
-	},
-	rightPriceScale: {
-		borderColor: 'rgba(197, 203, 206, 0.8)',
-	},
-	timeScale: {
-		borderColor: 'rgba(197, 203, 206, 0.8)',
-	},
-	/*
-	watermark: {
-		visible: true,
-		fontSize: 32,
-		horzAlign: 'center',
-		vertAlign: 'center',
-		color: 'rgba(171, 71, 188, 0.3)',
-		text: 'wyca-analytics.com',
-	},
-	*/
-});
-
-var ema50 = chart.addLineSeries({
-	color: 'rgba(4, 111, 232, 1)',
-	lineWidth: 2,
-});
-var ema50values = {{ ema50|safe }}
-ema50.setData(ema50values);
-
-var ema20 = chart.addLineSeries({
-	color: 'rgba(4, 111, 232, 1)',
-	lineWidth: 1,
-});
-var ema20values = {{ ema20|safe }}
-ema20.setData(ema20values);
-
-var volumeSeries = chart.addHistogramSeries({
-	color: '#26a69a',
-	priceFormat: {
-		type: 'volume',
-	},
-	priceScaleId: '',
-});
-volumeSeries.setData({{ volume|safe }});
-chart.priceScale('').applyOptions({
-	scaleMargins: {
-		top: 0.8,
-		bottom: 0,
-	},
-});
-
-var candleSeries = chart.addCandlestickSeries({
-  upColor: 'rgba(0, 150, 136, 0.8)',
-  downColor: 'rgba(255,82,82, 0.8)',
-  borderDownColor: '#dc3545',
-  borderUpColor: '#198754',
-  wickDownColor: 'rgba(255, 144, 0, 1)',
-  wickUpColor: 'rgba(255, 144, 0, 1)',
-});
-var candles = {{ full_data|safe }}
-candleSeries.setData(candles);
-
-// Make Chart Responsive with screen resize
-new ResizeObserver(entries => {
-      if (entries.length === 0 || entries[0].target !== chartContainer) { return; }
-      const newRect = entries[0].contentRect;
-      chart.applyOptions({ height: newRect.height, width: newRect.width });
-    }).observe(chartContainer);
-
-var toolTipMargin = 10;
-var priceScaleWidth = 50;
-var toolTip = document.createElement('div');
-toolTip.className = 'three-line-legend';
-chartHeader.appendChild(toolTip);
-toolTip.style.display = 'block';
-toolTip.style.left = 3 + 'px';
-toolTip.style.top = 3 + 'px';
-
-function setLastBarText() {
-	var currentBar = candles[candles.length - 1]
-	var currentBarTime = currentBar.time
-	var priceStr = (Math.round(currentBar.close * 100) / 100).toFixed(2)
-	var dateStr = currentBarTime.year + '-' + currentBarTime.month.toString().padStart(2,'0') + '-' + currentBarTime.day.toString().padStart(2,'0');
-	toolTip.innerHTML = '<div style="font-size: 22px; margin: 4px 0px; color: #20262E">' + '{{ security.currency_symbol }}' + " " + priceStr + '</div>' + '<div>' + dateStr + '</div>';
-}
-setLastBarText();
-
-
-
-var legend = document.createElement('div');
-legend.className = 'sma-legend';
-chartHeader.appendChild(legend);
-legend.style.display = 'block';
-legend.style.left = 3 + 'px';
-legend.style.top = 3 + 'px';
-
-function setLegendText(priceValue) {
-	let val = (Math.round(ema50values[ema50values.length - 1].value * 100) / 100).toFixed(2);
-	if (priceValue !== undefined) {
-		val = (Math.round(priceValue * 100) / 100).toFixed(2);
-	}
-	legend.innerHTML = 'EMA(50) <span style="color:rgba(4, 111, 232, 1)">' + val + '</span>';
-}
-
-setLegendText((Math.round(ema50values[ema50values.length - 1].value * 100) / 100).toFixed(2));
-
-
-chart.subscribeCrosshairMove((param) => {
-
-	if ( param === undefined || param.time === undefined || param.point.x < 0 || param.point.x > width || param.point.y < 0 || param.point.y > height ) {
-		setLastBarText();
-	} else {
-		dateStr = param.time;
-		const data = param.seriesData.get(candleSeries);
-		const price = data.value !== undefined ? data.value : data.close;
-		toolTip.innerHTML =	'<div style="font-size: 22px; margin: 4px 0px; color: #20262E">' + (Math.round(price * 100) / 100).toFixed(2) + '</div>' + '<div>' + dateStr + '</div>';
-	}
-
-	const data = param.seriesData.get(ema50);
-	if (!data) {
-		setLegendText(undefined);
-		return
-	}
-	const price = data.value !== undefined ? data.value : data.close;
-	setLegendText(price);
-});
-
-
+	show_history('{{ security.id }}', 'd')
 </script>
 
 

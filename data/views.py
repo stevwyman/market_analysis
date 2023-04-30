@@ -15,7 +15,7 @@ from data.technical_analysis import EMA, SMA, Hurst
 import json
 
 from data.OnlineDAO import Online_DAO_Factory, Interval
-from .models import Watchlist, Security, Daily, DailyUpdate, DataProvider
+from .models import Watchlist, Security, Daily, DailyUpdate, Weekly, WeeklyUpdate, Monthly, MonthlyUpdate
 from .forms import WatchlistForm, SecurityForm
 from .helper import humanize_price
 
@@ -345,9 +345,19 @@ def security_drop(request, watchlist_id):
 def history_update(request, security_id):
 
     sec = Security.objects.get(pk=security_id)
+    interval = request.GET.get("interval", "d")
     _today = date.today()
 
-    last_updated = sec.dailyupdate_data.all().first()
+    if interval == "1d":
+        last_updated = sec.dailyupdate_data.all().first()
+        _interval = Interval.DAILY
+    elif interval == "1w":
+        last_updated = sec.weeklyupdate_data.all().first()
+        _interval = Interval.WEEKLY
+    elif interval == "1mo":
+        last_updated = sec.monthlyupdate_data.all().first()
+        _interval = Interval.MONTHLY
+
     if last_updated is not None:
         print(f"last update: {last_updated.date}")
         if last_updated.date == _today:
@@ -359,22 +369,47 @@ def history_update(request, security_id):
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
 
     # request new history from online dao
-    result = online_dao.lookupHistory(security=sec, look_back=2000)
+    result = online_dao.lookupHistory(security=sec, interval=_interval, look_back=2000)
     if len(result) > 10:
 
         try:
             with transaction.atomic():
-                # drop current history
-                Daily.objects.filter(security=sec).delete()
-                try:
-                    DailyUpdate.objects.get(security=sec).delete()
-                except:
-                    pass
+                if interval == "1d":
+                    # drop current history
+                    Daily.objects.filter(security=sec).delete()
+                    try:
+                        DailyUpdate.objects.get(security=sec).delete()
+                    except:
+                        pass
 
-                # crate new history
-                Daily.objects.bulk_create(result)
-                DailyUpdate.objects.create(security=sec)
-                messages.info(request, "History has been updated")
+                    # crate new history
+                    Daily.objects.bulk_create(result)
+                    DailyUpdate.objects.create(security=sec)
+                    messages.info(request, "Daily history has been updated")
+                elif interval == "1w":
+                    # drop current history
+                    Weekly.objects.filter(security=sec).delete()
+                    try:
+                        WeeklyUpdate.objects.get(security=sec).delete()
+                    except:
+                        pass
+
+                    # crate new history
+                    Weekly.objects.bulk_create(result)
+                    WeeklyUpdate.objects.create(security=sec)
+                    messages.info(request, "Weekly history has been updated")
+                elif interval == "1mo":
+                    # drop current history
+                    Monthly.objects.filter(security=sec).delete()
+                    try:
+                        MonthlyUpdate.objects.get(security=sec).delete()
+                    except:
+                        pass
+
+                    # crate new history
+                    Monthly.objects.bulk_create(result)
+                    MonthlyUpdate.objects.create(security=sec)
+                    messages.info(request, "Monthly history has been updated")
 
         except DatabaseError as db_error:
             print(db_error)
@@ -384,18 +419,17 @@ def history_update(request, security_id):
     return HttpResponseRedirect(reverse("security", kwargs={"security_id": sec.id}))
 
 
-def technical_parameter(request, security_id):
+def technical_parameter(request, security_id) -> JsonResponse:
     sec = Security.objects.get(pk=security_id)
 
     if request.method == "POST":
 
-        print(request.body)
-         
         provided_data = json.loads(request.body)
-        print(f"technical parameter for {sec} requested")
+        view = provided_data.get("view")
         
         data = {}
-        if provided_data["view"] == "sd":
+        data["view"] = view
+        if view == "sd":
             
             daily = sec.daily_data.all()[:200]
 
@@ -412,8 +446,8 @@ def technical_parameter(request, security_id):
                     sd_entry['value'] = sd_value
                     hurst_data.append(sd_entry)
 
-            data["tp_data"] = json.dumps(hurst_data)
-        elif provided_data["view"] == "hurst":
+            data["tp_data"] = hurst_data
+        elif view == "hurst":
             daily = sec.daily_data.all()[:400]
 
             hurst_data = list()
@@ -429,7 +463,94 @@ def technical_parameter(request, security_id):
                     sd_entry['value'] = sma50.hurst()
                     hurst_data.append(sd_entry)
 
-            data["tp_data"] = json.dumps(hurst_data)
+            data["tp_data"] = hurst_data
         
         return JsonResponse(data, status=201)
 
+
+def security_history(request, security_id) -> JsonResponse:
+    """
+    POST: return a JsonResponse with a data dictionary holding:
+        candle - ohlcv
+        EMA(50) and EMA(20)
+    """
+
+    if request.method == "POST":
+        security = Security.objects.get(pk=security_id)
+        data = {}
+        if security is not None:
+
+            data["currency_symbol"] = security.currency_symbol
+        
+            provided_data = json.loads(request.body)
+            interval = provided_data.get("interval")
+            data["interval"] = interval
+            if interval == "d":
+                history = security.daily_data.all()[:1000]
+            elif interval == "w":
+                history = security.weekly_data.all()[:1000]
+            elif interval == "m":
+                history = security.monthly_data.all()[:1000]
+            else:
+                data["error"] = "invalid interval"
+                return JsonResponse(data, status=500)
+
+
+            prices_data = list()
+            ema50_data = list()
+            ema50 = EMA(50)
+
+            ema20_data = list()
+            ema20 = EMA(20)
+
+            volume_data = list()
+
+            previous_close = 0
+            for entry in reversed(history):
+                # building the prices data using time and ohlc
+                candle = {}
+                candle["time"] = str(entry.date)
+                candle["open"] = float(entry.open_price)
+                candle["high"] = float(entry.high_price)
+                candle["low"] = float(entry.low)
+                candle["close"] = float(entry.close)
+                prices_data.append(candle)
+
+                ema50_value = ema50.add(float(entry.close))
+                if ema50_value is not None:
+                    ema50_entry = {}
+                    ema50_entry["time"] = str(entry.date)
+                    ema50_entry["value"] = ema50_value
+                    ema50_data.append(ema50_entry)
+
+                ema20_value = ema20.add(float(entry.close))
+                if ema20_value is not None:
+                    ema20_entry = {}
+                    ema20_entry["time"] = str(entry.date)
+                    ema20_entry["value"] = ema20_value
+                    ema20_data.append(ema20_entry)
+                
+
+                volume = {}
+                volume["time"] = str(entry.date)
+                volume["value"] = float(entry.volume)
+                if candle["close"] >= previous_close:
+                    volume["color"] = RGB_GREEN
+                else:
+                    volume["color"] = RGB_RED
+                volume_data.append(volume)
+
+                previous_close = candle["close"]
+
+            data["price"] = prices_data
+            data["ema50"] = ema50_data
+            data["ema20"] = ema20_data
+            data["volume"] = volume_data
+        else:
+            data["error"] = "security not found"
+        status = 200
+    else:
+        data["error"] = "The resource was not found"
+        status = 404
+
+    return JsonResponse(data, status=status)
