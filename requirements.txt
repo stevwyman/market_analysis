@@ -3,4 +3,3 @@ django-bootstrap5
 urllib3
 numpy
 pymongo
-zoneinfo
