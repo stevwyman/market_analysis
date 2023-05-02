@@ -369,7 +369,7 @@ def history_update(request, security_id):
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
 
     # request new history from online dao
-    result = online_dao.lookupHistory(security=sec, interval=_interval, look_back=2000)
+    result = online_dao.lookupHistory(security=sec, interval=_interval, look_back=5000)
     if len(result) > 10:
 
         try:

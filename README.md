@@ -23,11 +23,11 @@ docker network create analysis_net
 
 #Note: port 8001
 docker run --net analysis_net --name analysis_py -p 8001:8001 market_analysis
-docker run --net analysis_net --name loving_tesla -p 27017:27017 mongo
+docker run --net analysis_net --name analysis_mongo -p 27017:27017 mongo
 
 # alternative add the image afterwards
-docker network connect mongo
-docker network connect market_analysis
+docker network connect analysis_net mongo
+docker network connect analysis_net market_analysis
 
 docker network inspect analysis_net
 

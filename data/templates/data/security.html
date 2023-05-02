@@ -4,17 +4,21 @@
 {% block body %}
 
 <section class="py-5 text-center container">
-  <h1>{{ security.name }}</h1>
-  <span class="fs-2 ms-2">{{ price.currency_symbol }}&nbsp;{{ price.price|floatformat:2 }}</span>
-  <span class="fs-4 ms-2 {% if price.change > 0 %} text-success fw-light {% else %} text-danger {% endif %}">{{ price.change|floatformat:2 }}&nbsp;({{ price.change_percent|floatformat:2 }}%)</span>
-  <span class="fs-6 ms-2 fw-light">{% load humanize %}{{ price.local_timestamp|naturaltime }}</span>
+	<h1>{{ security.name }}</h1>
+	<span class="fs-2 ms-2">{{ price.currency_symbol }}&nbsp;{{ price.price|floatformat:2 }}</span>
+	<span class="fs-4 ms-2 {% if price.change > 0 %} text-success fw-light {% else %} text-danger {% endif %}">{{ price.change|floatformat:2 }}&nbsp;({{ price.change_percent|floatformat:2 }}%)</span>
+	<span class="fs-6 ms-2 fw-light">{% load humanize %}{{ price.local_timestamp|naturaltime }}</span>
+
+	{% if price.additional_data is not None %}
+  	<p class="fs-6">{{ price.additional_data.state}}: {{ price.currency_symbol }}&nbsp;{{ price.additional_data.price|floatformat:2 }} {{ price.additional_data.change|floatformat:2 }}&nbsp;({{ price.additional_data.change_percent|floatformat:2 }}%) {% load humanize %}{{ price.additional_data.local_timestamp|naturaltime }}</p>
+	{% endif %}
 </section>
 
 {% csrf_token %}
 
 <div class="container">
 
-	<div class="row">
+	<div class="row py-1">
 		<div class="col col-md-8">
 			<div class="py-2">
 				<ul class="nav nav-tabs">
@@ -36,7 +40,6 @@
 				  </ul>
 			</div>
 			<div id="chartContainer"></div>
-			<div id="chartHeader"></div>
 		</div>
 		<div class="col col-md-4">
 			<div class="py-2">
@@ -49,9 +52,10 @@
 					</li>
 				  </ul>
 			</div>
-			<div>
-				{% if not defaultKeyStatistics.vars %}
-				not defaultKeyStatistics
+			<div class="fs-6 fw-light py-2">
+				
+				{% if price_orig.quoteType == "EQUITY" %}
+				<p>{{ security.sector}} | {{ security.industry }}</p>
 				{% endif %}
 
 				<table class="table">
@@ -82,26 +86,31 @@
 		
 	</div>
 	
-  	<div class="row bg-light py-5">
-		<div>
-			<a href="{% url 'history_update' security.id %}?interval=1d">update daily</a>
-	  	</div>
-		<div>
-			<a href="{% url 'history_update' security.id %}?interval=1w">update weekly</a>
-	  	</div>
-		<div>
-			<a href="{% url 'history_update' security.id %}?interval=1mo">update monthly</a>
-	  	</div>
+  	<div class="row bg-light py-1">
+		<div class="col col-md-8">
+			<div class="col py-2">
+				<a class="btn btn-sm btn-outline-primary" href="{% url 'history_update' security.id %}?interval=1d">update daily</a>
+				<a class="btn btn-sm btn-outline-primary" href="{% url 'history_update' security.id %}?interval=1w">update weekly</a>
+				<a class="btn btn-sm btn-outline-primary" href="{% url 'history_update' security.id %}?interval=1mo">update monthly</a>
+			</div>
+		</div>
+		<div class="col col-md-4">
+			<div class="col py-2">
+				&nbsp;
+			</div>
+		</div>
 	</div>
 </div>
-
+<!--
 <div class="container">
 	<ul>
-		{% for key, value in defaultKeyStatistics.items %} 
+		{% for key, value in price_orig.items %} 
 		<li>{{key}} - {{value}}</li>
 		{% endfor %}
 	</ul>
 </div>
+-->
+
 
 
 
