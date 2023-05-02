@@ -264,3 +264,156 @@ class YahooDAO:
         else:
             error = summary_profile["quoteSummary"]["error"]
             return {"error": error["description"]}
+
+    # assetProfile
+    def lookupAssetProfile(self, symbol) -> dict:
+        """
+        returns, if found, the "assetProfile" data set
+        """
+        _collection_assetProfile = self._db["assetProfile"]
+        try:
+            # check if we have a price entry in the mongo-db
+            assetProfile = _collection_assetProfile.find_one({"symbol": symbol})
+            if assetProfile is None:
+                print(f"no price object for {symbol}")
+            else:
+                # check if the available entry is older than 5 minutes
+                entry_ts = assetProfile["timestamp"]
+                current_ts = datetime.now().timestamp()
+
+                if entry_ts + 86400 > current_ts:  # for testing 1 day
+                    print(f"serving 'assetProfile' for {symbol} from db")
+                    return assetProfile["assetProfile"]
+                else:
+                    print(f"need to refresh the 'assetProfile' in the database")
+
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print("Could not write data to locale storage: ", e)
+
+
+        http = urllib3.PoolManager()
+        r = http.request(
+            "GET",
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
+            fields={
+                "formatted": "true",
+                "lang": "en-US",
+                "region": "US",
+                "modules": "assetProfile",
+                "corsDomain": "finance.yahoo.com",
+            },
+        )
+        print(f"status for requesting 'assetProfile' of {symbol}: {r.status}")
+        summary_profile = json.loads(r.data.decode("utf-8"))
+
+        if r.status == 200:
+            assetProfile = summary_profile["quoteSummary"]["result"][0]["assetProfile"]
+
+            upsertable_data = {"timestamp":datetime.now().timestamp(), "assetProfile":assetProfile}
+            _collection_assetProfile.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            return assetProfile
+        else:
+            error = summary_profile["quoteSummary"]["error"]
+            return {"error": error["description"]}
+
+    # financialData
+    def lookup_financial_data(self, symbol) -> dict:
+        """
+        returns, if found, the "financialData" data set
+        """
+        _collection_financialData = self._db["financialData"]
+        try:
+            # check if we have a price entry in the mongo-db
+            financialData = _collection_financialData.find_one({"symbol": symbol})
+            if financialData is None:
+                print(f"no price object for {symbol}")
+            else:
+                # check if the available entry is older than 5 minutes
+                entry_ts = financialData["timestamp"]
+                current_ts = datetime.now().timestamp()
+
+                if entry_ts + 86400 > current_ts:  # for testing 1 day
+                    print(f"serving 'financialData' for {symbol} from db")
+                    return financialData["financialData"]
+                else:
+                    print(f"need to refresh the 'financialData' in the database")
+
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print("Could not write data to locale storage: ", e)
+
+
+        http = urllib3.PoolManager()
+        r = http.request(
+            "GET",
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
+            fields={
+                "formatted": "true",
+                "lang": "en-US",
+                "region": "US",
+                "modules": "financialData",
+                "corsDomain": "finance.yahoo.com",
+            },
+        )
+        print(f"status for requesting 'financialData' of {symbol}: {r.status}")
+        summary_profile = json.loads(r.data.decode("utf-8"))
+
+        if r.status == 200:
+            financialData = summary_profile["quoteSummary"]["result"][0]["financialData"]
+
+            upsertable_data = {"timestamp":datetime.now().timestamp(), "financialData":financialData}
+            _collection_financialData.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            return financialData
+        else:
+            error = summary_profile["quoteSummary"]["error"]
+            return {"error": error["description"]}
+
+    # summary_detail
+    def lookup_summary_detail(self, symbol) -> dict:
+        """
+        returns, if found, the "summaryDetail" data set
+        """
+        _collection_summaryDetail = self._db["summaryDetail"]
+        try:
+            # check if we have a price entry in the mongo-db
+            summaryDetail = _collection_summaryDetail.find_one({"symbol": symbol})
+            if summaryDetail is None:
+                print(f"no 'summaryDetail' object for {symbol}")
+            else:
+                # check if the available entry is older than 5 minutes
+                entry_ts = summaryDetail["timestamp"]
+                current_ts = datetime.now().timestamp()
+
+                if entry_ts + 86400 > current_ts:  # for testing 1 day
+                    print(f"serving 'summaryDetail' for {symbol} from db")
+                    return summaryDetail["summaryDetail"]
+                else:
+                    print(f"need to refresh the 'summaryDetail' in the database")
+
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print("Could not write data to locale storage: ", e)
+
+
+        http = urllib3.PoolManager()
+        r = http.request(
+            "GET",
+            "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
+            fields={
+                "formatted": "true",
+                "lang": "en-US",
+                "region": "US",
+                "modules": "summaryDetail",
+                "corsDomain": "finance.yahoo.com",
+            },
+        )
+        print(f"status for requesting 'summaryDetail' of {symbol}: {r.status}")
+        summary_profile = json.loads(r.data.decode("utf-8"))
+
+        if r.status == 200:
+            summaryDetail = summary_profile["quoteSummary"]["result"][0]["summaryDetail"]
+
+            upsertable_data = {"timestamp":datetime.now().timestamp(), "summaryDetail":summaryDetail}
+            _collection_summaryDetail.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            return summaryDetail
+        else:
+            error = summary_profile["quoteSummary"]["error"]
+            return {"error": error["description"]}

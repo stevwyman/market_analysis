@@ -41,7 +41,7 @@ class Security(models.Model):
 
     data_provider = models.ForeignKey(DataProvider, on_delete=models.CASCADE)
 
-    type  # stock, index, commodity, ...
+    type = models.CharField(max_length=24)
 
     industry = models.CharField(max_length=255)
     sector = models.CharField(max_length=255)

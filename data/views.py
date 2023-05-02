@@ -17,7 +17,7 @@ import json
 from data.OnlineDAO import Online_DAO_Factory, Interval
 from .models import Watchlist, Security, Daily, DailyUpdate, Weekly, WeeklyUpdate, Monthly, MonthlyUpdate
 from .forms import WatchlistForm, SecurityForm
-from .helper import humanize_price
+from .helper import humanize_price, humanize_fundamentals
 
 # Create your views here.
 
@@ -193,10 +193,12 @@ def security(request, security_id):
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
     price = online_dao.lookupPrice(sec.symbol)
 
+    fundamentals = {}
     if price["quoteType"] == "EQUITY":
-        defaultKeyStatistics = online_dao.lookupDefaultKeyStatistics(sec.symbol)
+        quoteSummary = online_dao.lookup_summary_detail(sec.symbol)
+        fundamentals = humanize_fundamentals(online_dao.lookup_financial_data(sec.symbol), online_dao.lookupDefaultKeyStatistics(sec.symbol), online_dao.lookup_summary_detail(sec.symbol))
     else:
-        defaultKeyStatistics = {}
+        quoteSummary = {}
 
 
     return render(
@@ -204,15 +206,10 @@ def security(request, security_id):
         "data/security.html",
         {
             "security": sec,
-            "full_data": prices_data,
-            "ema50": ema50_data,
-            "ema20": ema20_data,
-            "sma50_sd": sma50_sd,
-            "volume": volume_data,
             "hurst_value": hurst_value,
             "price":humanize_price(price),
-            "price_orig":price,
-            "defaultKeyStatistics":defaultKeyStatistics
+            "fundamentals": fundamentals,
+            "quote_summary":quoteSummary
         },
     )
 
@@ -245,25 +242,17 @@ def security_new(request, watchlist_id):
 
             # create new Security
             sec = Security(symbol=symbol, data_provider=dataProvider)
-            shortName = price["shortName"]
-            sec.name = shortName
-            currencySymbol = price["currencySymbol"]
-            sec.currency_symbol = currencySymbol
-            currency = price["currency"]
-            sec.currency = currency
-            quoteType = price["quoteType"]
-            # sec
-            exchangeName = price["exchangeName"]
-            sec.exchange = exchangeName
+            sec.name = price["shortName"]
+            sec.currency_symbol = price["currencySymbol"]
+            sec.currency = price["currency"]
+            sec.type = price["quoteType"]
+            sec.exchange = price["exchangeName"]
 
             summaryProfile = online_dao.lookupSymbol(symbol)
             try:
-                country = summaryProfile["country"]
-                sec.country = country
-                industry = summaryProfile["industry"]
-                sec.industry = industry
-                sector = summaryProfile["sector"]
-                sec.sector = sector
+                sec.country = summaryProfile["country"]
+                sec.industry = summaryProfile["industry"]
+                sec.sector = summaryProfile["sector"]
             except:
                 messages.warning(request, summaryProfile["error"])
 
@@ -469,9 +458,10 @@ def technical_parameter(request, security_id) -> JsonResponse:
 
 
 def security_history(request, security_id) -> JsonResponse:
+
     """
     POST: return a JsonResponse with a data dictionary holding:
-        candle - ohlcv
+        candle - ohlcv, Note: using the lookupPrice, we add the regular market as well
         EMA(50) and EMA(20)
     """
 
@@ -530,15 +520,16 @@ def security_history(request, security_id) -> JsonResponse:
                     ema20_entry["value"] = ema20_value
                     ema20_data.append(ema20_entry)
                 
-
-                volume = {}
-                volume["time"] = str(entry.date)
-                volume["value"] = float(entry.volume)
-                if candle["close"] >= previous_close:
-                    volume["color"] = RGB_GREEN
-                else:
-                    volume["color"] = RGB_RED
-                volume_data.append(volume)
+                volume_value = float(entry.volume)
+                if volume_value > 0:
+                    volume = {}
+                    volume["time"] = str(entry.date)
+                    volume["value"] = volume_value
+                    if candle["close"] >= previous_close:
+                        volume["color"] = RGB_GREEN
+                    else:
+                        volume["color"] = RGB_RED
+                    volume_data.append(volume)
 
                 previous_close = candle["close"]
 
@@ -548,9 +539,21 @@ def security_history(request, security_id) -> JsonResponse:
             data["volume"] = volume_data
         else:
             data["error"] = "security not found"
+
+        
+        symbol = security.symbol
+        dataProvider = security.data_provider
+            
+        # looking up additional information
+        online_dao = Online_DAO_Factory().get_online_dao(dataProvider)
+
+        price = online_dao.lookupPrice(symbol)
+        time_ts = datetime.utcfromtimestamp(price["regularMarketTime"]).strftime("%Y-%m-%d")
+        data["price"].append({"time": time_ts, "open": price["regularMarketOpen"]["raw"], "high": price["regularMarketDayHigh"]["raw"], "low": price["regularMarketDayLow"]["raw"], "close":price["regularMarketPrice"]["raw"]})
         status = 200
     else:
         data["error"] = "The resource was not found"
         status = 404
 
     return JsonResponse(data, status=status)
+

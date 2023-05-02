@@ -123,20 +123,23 @@ function generate_chart(data){
 	var ema20values = data.ema20
 	ema20.setData(ema20values);
 	
-	var volumeSeries = chart.addHistogramSeries({
-		color: '#26a69a',
-		priceFormat: {
-			type: 'volume',
-		},
-		priceScaleId: '',
-	});
-	volumeSeries.setData(data.volume);
-	chart.priceScale('').applyOptions({
-		scaleMargins: {
-			top: 0.8,
-			bottom: 0,
-		},
-	});
+	if (data.volume.length > 0){
+		var volumeSeries = chart.addHistogramSeries({
+			color: '#26a69a',
+			priceFormat: {
+				type: 'volume',
+			},
+			priceScaleId: '',
+		});
+		volumeSeries.setData(data.volume);
+		chart.priceScale('').applyOptions({
+			scaleMargins: {
+				top: 0.8,
+				bottom: 0,
+			},
+		});
+	}
+
 	
 	var candleSeries = chart.addCandlestickSeries({
 	  upColor: 'rgba(0, 150, 136, 0.8)',
@@ -147,6 +150,7 @@ function generate_chart(data){
 	  wickUpColor: 'rgba(255, 144, 0, 1)',
 	});
 	var candles = data.price
+	console.log(candles)
 	candleSeries.setData(candles);
 
 	document.querySelector("#nl_daily").classList.remove("active")

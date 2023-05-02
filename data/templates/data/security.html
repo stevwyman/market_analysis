@@ -44,9 +44,11 @@
 		<div class="col col-md-4">
 			<div class="py-2">
 				<ul class="nav nav-tabs">
+					{% if security.type == "EQUITY" %}
 					<li class="nav-item">
-					  <a class="nav-link active" aria-current="page" href="#">fundamental</a>
+						<a class="nav-link active" aria-current="page" href="#">Fundamentals</a>
 					</li>
+					{% endif %}
 					<li class="nav-item">
 					  <a class="nav-link" href="#">Technical</a>
 					</li>
@@ -54,32 +56,35 @@
 			</div>
 			<div class="fs-6 fw-light py-2">
 				
-				{% if price_orig.quoteType == "EQUITY" %}
+				{% if security.type == "EQUITY" %}
 				<p>{{ security.sector}} | {{ security.industry }}</p>
-				{% endif %}
-
 				<table class="table">
 					<tr>
 						<td>PE<sub>forward</sub></td>
-						<td>{{ defaultKeyStatistics.forwardPE.raw|floatformat:2 }}</td>
+						<td>{{ fundamentals.pe_forward|floatformat:2 }}</td>
+					</tr>
+					<tr>
+						<td>PE<sub>trailing</sub></td>
+						<td>{{ fundamentals.pe_trailing|floatformat:2 }}</td>
 					</tr>
 					<tr>
 						<td>PEG</td>
-						<td>{{ defaultKeyStatistics.pegRatio.raw|floatformat:2 }}</td>
+						<td>{% if fundamentals.peg_ratio == "N/A" %}N/A{% else %}{{ fundamentals.peg_ratio|floatformat:2 }}{% endif %}</td>
 					</tr>
 					<tr>
-						<td>EV/rev</td>
-						<td>{{ defaultKeyStatistics.enterpriseToRevenue.raw|floatformat:2 }}</td>
+						<td>free cash flow</td>
+						<td>{% if fundamentals.free_cash_flow == "N/A" %}N/A{% else %}{{ fundamentals.free_cash_flow|floatformat:2 }}{% endif %}</td>
 					</tr>
 					<tr>
 						<td>EV/Ebitda</td>
 						<td>{{ defaultKeyStatistics.enterpriseToEbitda.raw|floatformat:2 }}</td>
 					</tr>
 					<tr>
-						<td>Short/Float<br><small>{{ defaultKeyStatistics.dateShortInterest.fmt }}</small></td>
+						<td>Short/Float<br><small>{{ fundamentals.short_float }}</small></td>
 						<td>{{ defaultKeyStatistics.shortPercentOfFloat.fmt }}</td>
 					</tr>
 				</table>
+				{% endif %}
 				
 			</div>
 		</div>
@@ -101,15 +106,15 @@
 		</div>
 	</div>
 </div>
-<!--
+
 <div class="container">
 	<ul>
-		{% for key, value in price_orig.items %} 
+		{% for key, value in quote_summary.items %} 
 		<li>{{key}} - {{value}}</li>
 		{% endfor %}
 	</ul>
 </div>
--->
+
 
 
 
