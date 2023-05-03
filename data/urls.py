@@ -13,4 +13,6 @@ urlpatterns = [
     path("security_history/<int:security_id>", views.security_history, name="security_history"),
     path("history_update/<int:security_id>", views.history_update, name="history_update"),
     path("tp/<int:security_id>", views.technical_parameter, name="technical_parameter"),
+    path("ta/<int:security_id>", views.tech_analysis, name="tech_analysis"),
+    path("fa/<int:security_id>", views.fundamental_analysis, name="fundamental_analysis"),
 ]

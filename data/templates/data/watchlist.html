@@ -13,8 +13,9 @@
                 <tr class="text-center">
                     <th scope="col" class="d-table-cell d-sm-none">Symbol</th>
                     <th scope="col" class="d-none d-sm-table-cell">Name</th>
-                    <th scope="col" class="d-none d-sm-table-cell">price ()</th>
+                    <th scope="col" class="d-none d-sm-table-cell">latest</th>
                     <th scope="col">change<br>(<a href="?order_by=change&direction=desc">&darr;</a><a href="?order_by=change&direction=asc">&uarr;</a>)</th>
+                    <th scope="col" class="d-none d-sm-table-cell">PE<sub>forward</sub><br>(<a href="?order_by=pef&direction=desc">&darr;</a><a href="?order_by=pef&direction=asc">&uarr;</a>)</th>
                     <th scope="col" class="d-none d-sm-table-cell">SMA(50)</th>
                     <th scope="col">spread<br>(<a href="?order_by=spread&direction=desc">&darr;</a><a href="?order_by=spread&direction=asc">&uarr;</a>)</th>
                     <th scope="col">Hurst<br>(<a href="?order_by=hurst&direction=desc">&darr;</a><a href="?order_by=hurst&direction=asc">&uarr;</a>)</th>
@@ -28,6 +29,7 @@
                     <td class="d-none d-sm-table-cell"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.name }}</a></th>
                     <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.price.currency_symbol }}&nbsp;{{ watchlist_entry.price.price }}<br>{% load humanize %}{{ watchlist_entry.price.local_timestamp|naturaltime }}</td>
                     <td class="text-end">{{ watchlist_entry.price.change_percent|floatformat:2 }}%<br>({{ watchlist_entry.price.change|floatformat:2 }})</td>
+                    <td class="text-end">{{ watchlist_entry.fundamentals.pe_forward|floatformat:1 }}</td>
                     <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.sma.sma|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.sd|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.hurst|floatformat:2 }}</td>

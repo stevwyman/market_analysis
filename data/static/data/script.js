@@ -64,6 +64,113 @@ function show_tp(security_id, parameter){
 }
 
 
+function show_ta(security_id){
+
+    fetch("/data/ta/" + security_id, {
+        method: "GET",
+        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
+        mode: "same-origin"
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+
+				if (document.querySelector("#fa_link") != null){
+					document.querySelector("#fa_link").classList.remove("active")
+				}
+				document.querySelector("#ta_link").classList.add("active")
+
+				div = document.querySelector("#a_data")
+				div.innerHTML = ""
+				table = document.createElement("table")
+				table.classList.add("table", "table-responsive", "table-hover")
+				tbody = document.createElement("tbody")
+				table.append(tbody)
+				for (let key in data) {
+					_tr = document.createElement("tr")
+					
+					_td_l = document.createElement("td")
+					_td_l.innerHTML = key
+					_tr.append(_td_l)
+
+					_td_r = document.createElement("td")
+					_td_r.innerHTML = data[key].toFixed(2)
+					_tr.append(_td_r)
+					tbody.append(_tr)
+				}
+				div.append(table)
+
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+}
+
+
+function show_fa(security_id){
+
+    fetch("/data/fa/" + security_id, {
+        method: "GET",
+        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
+        mode: "same-origin"
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+				
+				if (document.querySelector("#fa_link") != null){
+					document.querySelector("#fa_link").classList.add("active")
+				}
+				document.querySelector("#ta_link").classList.remove("active")
+
+				div = document.querySelector("#a_data")
+				div.innerHTML = ""
+				table = document.createElement("table")
+				table.classList.add("table", "table-responsive", "table-hover")
+				tbody = document.createElement("tbody")
+				table.append(tbody)
+				for (let key in data) {
+					_tr = document.createElement("tr")
+					
+					_td_l = document.createElement("td")
+					_td_l.innerHTML = key
+					_tr.append(_td_l)
+
+					_td_r = document.createElement("td")
+					if (data[key] === "N/A"){
+						_td_r.innerHTML = "N/A"
+					} else {
+						_td_r.innerHTML = data[key].toFixed(2)
+					}
+					
+					_tr.append(_td_r)
+					tbody.append(_tr)
+				}
+				div.append(table)
+
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+}
+
+
 function generate_chart(data){
 	var width = 800;
 	var height = 450;
@@ -150,7 +257,6 @@ function generate_chart(data){
 	  wickUpColor: 'rgba(255, 144, 0, 1)',
 	});
 	var candles = data.price
-	console.log(candles)
 	candleSeries.setData(candles);
 
 	document.querySelector("#nl_daily").classList.remove("active")

@@ -77,8 +77,9 @@ def watchlist(request, watchlist_id:int):
     for security in securities:
         watchlist_entry = {}
         watchlist_entry["security"] = security
-        price_dao = Online_DAO_Factory().get_online_dao(security.data_provider)
-        watchlist_entry["price"] = humanize_price(price_dao.lookupPrice(security.symbol))
+        dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+        watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
+        watchlist_entry["fundamentals"] = humanize_fundamentals(dao.lookup_financial_data(security), dao.lookup_default_key_statistics(security), dao.lookup_summary_detail(security))
         try:
             history = security.daily_data.all()[:55]
             watchlist_entry["sma"] = SMA(50).latest(history)
@@ -102,6 +103,8 @@ def watchlist(request, watchlist_id:int):
         watchlist_entries.sort(key=lambda x: x["sma"]["hurst"], reverse=_b_direction)
     elif order_by == "spread":
         watchlist_entries.sort(key=lambda x: x["sma"]["sd"], reverse=_b_direction)
+    elif order_by == "pef":
+        watchlist_entries.sort(key=lambda x: x["fundamentals"]["pe_forward"], reverse=_b_direction)
 
     # pagination
     paginator = Paginator(watchlist_entries, 10)
@@ -195,8 +198,8 @@ def security(request, security_id):
 
     fundamentals = {}
     if price["quoteType"] == "EQUITY":
-        quoteSummary = online_dao.lookup_summary_detail(sec.symbol)
-        fundamentals = humanize_fundamentals(online_dao.lookup_financial_data(sec.symbol), online_dao.lookupDefaultKeyStatistics(sec.symbol), online_dao.lookup_summary_detail(sec.symbol))
+        quoteSummary = online_dao.lookup_summary_detail(sec)
+        fundamentals = humanize_fundamentals(online_dao.lookup_financial_data(sec), online_dao.lookup_default_key_statistics(sec), online_dao.lookup_summary_detail(sec))
     else:
         quoteSummary = {}
 
@@ -456,6 +459,49 @@ def technical_parameter(request, security_id) -> JsonResponse:
         
         return JsonResponse(data, status=201)
 
+
+def tech_analysis(request, security_id) -> JsonResponse:
+    """
+    generates a dictionary holding the current values for the different technical analysis parameter
+    """
+
+    sec = Security.objects.get(pk=security_id)
+    data = {}
+    if sec is None:
+        data["error", "security has not been found"]
+        return JsonResponse(data, status=404)
+    
+    sma50 = SMA(50)
+    ema50 = EMA(50)
+    ema20 = EMA(20)
+
+    daily = sec.daily_data.all()[:1000]
+    for entry in reversed(daily):
+        close = float(entry.close)
+        sma50.add(close)
+        ema50_value = ema50.add(close)
+        ema20_value = ema20.add(close)
+
+    data["hurst"] = sma50.hurst()
+    data["ema50"] = ema50_value
+    data["ema20"] = ema20_value
+    data["sd"] = sma50.sigma_delta()
+
+    return JsonResponse(data, status=201)
+
+
+def fundamental_analysis(request, security_id) -> JsonResponse:
+    
+    sec = Security.objects.get(pk=security_id)
+    if sec is None:
+        return JsonResponse({"error", "security has not been found"}, status=404)
+    
+    if sec.type == "EQUITY":
+        online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+        data = humanize_fundamentals(online_dao.lookup_financial_data(sec), online_dao.lookup_default_key_statistics(sec), online_dao.lookup_summary_detail(sec))
+        return JsonResponse(data, status=201)
+    else:
+        return JsonResponse({"error":"no fundamental data available"}, status=404)
 
 def security_history(request, security_id) -> JsonResponse:
 

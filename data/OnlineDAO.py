@@ -215,11 +215,14 @@ class YahooDAO:
 
         return historic_entries
 
-    def lookupDefaultKeyStatistics(self, symbol) -> dict:
+    def lookup_default_key_statistics(self, security:Security) -> dict:
         """
         returns, if found, the "defaultKeyStatistics" data set
         """
-
+        if security.type != "EQUITY":
+            return {"error": "Not an equity."}
+        else:
+            symbol = security.symbol
         try:
             # check if we have a price entry in the mongo-db
             defaultKeyStatistics = self._collection_dks.find_one({"symbol": symbol})
@@ -266,10 +269,14 @@ class YahooDAO:
             return {"error": error["description"]}
 
     # assetProfile
-    def lookupAssetProfile(self, symbol) -> dict:
+    def lookupAssetProfile(self, security: Security) -> dict:
         """
         returns, if found, the "assetProfile" data set
         """
+        if security.type != "EQUITY":
+            return {"error": "Not an equity."}
+        else:
+            symbol = security.symbol
         _collection_assetProfile = self._db["assetProfile"]
         try:
             # check if we have a price entry in the mongo-db
@@ -317,10 +324,14 @@ class YahooDAO:
             return {"error": error["description"]}
 
     # financialData
-    def lookup_financial_data(self, symbol) -> dict:
+    def lookup_financial_data(self, security: Security) -> dict:
         """
         returns, if found, the "financialData" data set
         """
+        if security.type != "EQUITY":
+            return {"error": "Not an equity."}
+        else:
+            symbol = security.symbol
         _collection_financialData = self._db["financialData"]
         try:
             # check if we have a price entry in the mongo-db
@@ -368,10 +379,15 @@ class YahooDAO:
             return {"error": error["description"]}
 
     # summary_detail
-    def lookup_summary_detail(self, symbol) -> dict:
+    def lookup_summary_detail(self, security: Security) -> dict:
         """
         returns, if found, the "summaryDetail" data set
         """
+        if security.type != "EQUITY":
+            return {"error": "Not an equity."}
+        else:
+            symbol = security.symbol
+
         _collection_summaryDetail = self._db["summaryDetail"]
         try:
             # check if we have a price entry in the mongo-db

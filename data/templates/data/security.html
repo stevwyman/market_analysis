@@ -46,49 +46,32 @@
 				<ul class="nav nav-tabs">
 					{% if security.type == "EQUITY" %}
 					<li class="nav-item">
-						<a class="nav-link active" aria-current="page" href="#">Fundamentals</a>
+						<a class="nav-link active" id="fa_link" aria-current="page" onClick="show_fa('{{ security.id }}')" href="#">Fundamentals</a>
 					</li>
 					{% endif %}
 					<li class="nav-item">
-					  <a class="nav-link" href="#">Technical</a>
+					  <a class="nav-link" id="ta_link" onClick="show_ta('{{ security.id }}')" href="#">Technical</a>
 					</li>
 				  </ul>
 			</div>
-			<div class="fs-6 fw-light py-2">
-				
+			<div class="fs-6 fw-light py-2" >
 				{% if security.type == "EQUITY" %}
 				<p>{{ security.sector}} | {{ security.industry }}</p>
-				<table class="table">
-					<tr>
-						<td>PE<sub>forward</sub></td>
-						<td>{{ fundamentals.pe_forward|floatformat:2 }}</td>
-					</tr>
-					<tr>
-						<td>PE<sub>trailing</sub></td>
-						<td>{{ fundamentals.pe_trailing|floatformat:2 }}</td>
-					</tr>
-					<tr>
-						<td>PEG</td>
-						<td>{% if fundamentals.peg_ratio == "N/A" %}N/A{% else %}{{ fundamentals.peg_ratio|floatformat:2 }}{% endif %}</td>
-					</tr>
-					<tr>
-						<td>free cash flow</td>
-						<td>{% if fundamentals.free_cash_flow == "N/A" %}N/A{% else %}{{ fundamentals.free_cash_flow|floatformat:2 }}{% endif %}</td>
-					</tr>
-					<tr>
-						<td>EV/Ebitda</td>
-						<td>{{ defaultKeyStatistics.enterpriseToEbitda.raw|floatformat:2 }}</td>
-					</tr>
-					<tr>
-						<td>Short/Float<br><small>{{ fundamentals.short_float }}</small></td>
-						<td>{{ defaultKeyStatistics.shortPercentOfFloat.fmt }}</td>
-					</tr>
-				</table>
 				{% endif %}
-				
+				<div id="a_data">
+					{% if security.type == "EQUITY" %}
+					<script>
+						show_fa('{{ security.id }}')
+					</script>
+					{% else %}
+					<script>
+						show_ta('{{ security.id }}')
+					</script>
+					{% endif %}
+					
+				</div>
 			</div>
 		</div>
-		
 	</div>
 	
   	<div class="row bg-light py-1">
