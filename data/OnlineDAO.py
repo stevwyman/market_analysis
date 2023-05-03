@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 
 from data.models import Daily, Security
 
+
 class Interval(Enum):
     HOURLY = "1h"
     DAILY = "1d"
@@ -31,19 +32,18 @@ class Online_DAO_Factory:
 
 
 class YahooDAO:
-    
     def __init__(self) -> None:
         config = configparser.ConfigParser()
         config.read("config.ini")
-        self._client = pymongo.MongoClient(config.get("DB","url"))
+        self._client = pymongo.MongoClient(config.get("DB", "url"))
         try:
             self._client.server_info()
         except pymongo.errors.ServerSelectionTimeoutError:
             exit("Mongo instance not reachable.")
 
-        self._db = self._client[config.get("DB","db")]
-        self._collection_price = self._db[config.get("DB.YAHOO.PRICE","collection")]
-        self._collection_dks = self._db[config.get("DB.YAHOO.DKS","collection")]
+        self._db = self._client[config.get("DB", "db")]
+        self._collection_price = self._db[config.get("DB.YAHOO.PRICE", "collection")]
+        self._collection_dks = self._db[config.get("DB.YAHOO.DKS", "collection")]
 
     def lookupSymbol(self, symbol) -> dict:
         """
@@ -126,7 +126,6 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-
         http = urllib3.PoolManager()
         r = http.request(
             "GET",
@@ -145,8 +144,10 @@ class YahooDAO:
         if r.status == 200:
             price = summary_profile["quoteSummary"]["result"][0]["price"]
 
-            upsertable_data = {"timestamp":datetime.now().timestamp(), "price":price}
-            self._collection_price.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            upsertable_data = {"timestamp": datetime.now().timestamp(), "price": price}
+            self._collection_price.update_one(
+                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            )
             return price
         else:
             error = summary_profile["quoteSummary"]["error"]
@@ -215,7 +216,7 @@ class YahooDAO:
 
         return historic_entries
 
-    def lookup_default_key_statistics(self, security:Security) -> dict:
+    def lookup_default_key_statistics(self, security: Security) -> dict:
         """
         returns, if found, the "defaultKeyStatistics" data set
         """
@@ -242,7 +243,6 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-
         http = urllib3.PoolManager()
         r = http.request(
             "GET",
@@ -259,10 +259,17 @@ class YahooDAO:
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
-            defaultKeyStatistics = summary_profile["quoteSummary"]["result"][0]["defaultKeyStatistics"]
+            defaultKeyStatistics = summary_profile["quoteSummary"]["result"][0][
+                "defaultKeyStatistics"
+            ]
 
-            upsertable_data = {"timestamp":datetime.now().timestamp(), "defaultKeyStatistics":defaultKeyStatistics}
-            self._collection_dks.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            upsertable_data = {
+                "timestamp": datetime.now().timestamp(),
+                "defaultKeyStatistics": defaultKeyStatistics,
+            }
+            self._collection_dks.update_one(
+                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            )
             return defaultKeyStatistics
         else:
             error = summary_profile["quoteSummary"]["error"]
@@ -297,7 +304,6 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-
         http = urllib3.PoolManager()
         r = http.request(
             "GET",
@@ -316,8 +322,13 @@ class YahooDAO:
         if r.status == 200:
             assetProfile = summary_profile["quoteSummary"]["result"][0]["assetProfile"]
 
-            upsertable_data = {"timestamp":datetime.now().timestamp(), "assetProfile":assetProfile}
-            _collection_assetProfile.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            upsertable_data = {
+                "timestamp": datetime.now().timestamp(),
+                "assetProfile": assetProfile,
+            }
+            _collection_assetProfile.update_one(
+                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            )
             return assetProfile
         else:
             error = summary_profile["quoteSummary"]["error"]
@@ -352,7 +363,6 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-
         http = urllib3.PoolManager()
         r = http.request(
             "GET",
@@ -369,10 +379,17 @@ class YahooDAO:
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
-            financialData = summary_profile["quoteSummary"]["result"][0]["financialData"]
+            financialData = summary_profile["quoteSummary"]["result"][0][
+                "financialData"
+            ]
 
-            upsertable_data = {"timestamp":datetime.now().timestamp(), "financialData":financialData}
-            _collection_financialData.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            upsertable_data = {
+                "timestamp": datetime.now().timestamp(),
+                "financialData": financialData,
+            }
+            _collection_financialData.update_one(
+                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            )
             return financialData
         else:
             error = summary_profile["quoteSummary"]["error"]
@@ -408,7 +425,6 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-
         http = urllib3.PoolManager()
         r = http.request(
             "GET",
@@ -425,10 +441,17 @@ class YahooDAO:
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
-            summaryDetail = summary_profile["quoteSummary"]["result"][0]["summaryDetail"]
+            summaryDetail = summary_profile["quoteSummary"]["result"][0][
+                "summaryDetail"
+            ]
 
-            upsertable_data = {"timestamp":datetime.now().timestamp(), "summaryDetail":summaryDetail}
-            _collection_summaryDetail.update_one({"symbol": symbol}, {"$set": upsertable_data}, upsert=True)
+            upsertable_data = {
+                "timestamp": datetime.now().timestamp(),
+                "summaryDetail": summaryDetail,
+            }
+            _collection_summaryDetail.update_one(
+                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            )
             return summaryDetail
         else:
             error = summary_profile["quoteSummary"]["error"]

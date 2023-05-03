@@ -1,8 +1,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+
 def humanize_price(price: dict) -> dict:
-    data={}
+    data = {}
     data["currency_symbol"] = price["currencySymbol"]
 
     orig_timezone = ZoneInfo("America/New_York")
@@ -23,7 +24,7 @@ def humanize_price(price: dict) -> dict:
     data["price"] = regularMarketPrice
     data["change"] = regularMarketChange
     data["change_percent"] = regularMarketChangePercent
-    
+
     marketState = price["marketState"]
     data["marketState"] = marketState
 
@@ -38,11 +39,12 @@ def humanize_price(price: dict) -> dict:
             additional_data["local_timestamp"] = local_dt_object
             additional_data["price"] = price["postMarketPrice"]["raw"]
             additional_data["change"] = price["postMarketChange"]["raw"]
-            additional_data["change_percent"] = price["postMarketChangePercent"]["raw"] * 100
+            additional_data["change_percent"] = (
+                price["postMarketChangePercent"]["raw"] * 100
+            )
             data["additional_data"] = additional_data
-        
-    elif marketState == "PRE":
 
+    elif marketState == "PRE":
         # show pre market time
         if "preMarketTime" in price.keys():
             preMarketTime = price["preMarketTime"]
@@ -53,20 +55,23 @@ def humanize_price(price: dict) -> dict:
             additional_data["local_timestamp"] = local_dt_object
             additional_data["price"] = price["preMarketPrice"]["raw"]
             additional_data["change"] = price["preMarketChange"]["raw"]
-            additional_data["change_percent"] = price["preMarketChangePercent"]["raw"] * 100
+            additional_data["change_percent"] = (
+                price["preMarketChangePercent"]["raw"] * 100
+            )
             data["additional_data"] = additional_data
-    
+
     return data
 
-def humanize_fundamentals(financial_data: dict, default_key_statistics: dict, summary_detail: dict) -> dict():
 
+def humanize_fundamentals(
+    financial_data: dict, default_key_statistics: dict, summary_detail: dict
+) -> dict():
     data = {}
 
     data["free_cash_flow"] = "N/A"
     if "freeCashflow" in financial_data.keys():
         if "raw" in financial_data["freeCashflow"].keys():
             data["free_cash_flow"] = financial_data["freeCashflow"]["raw"]
-    
 
     if "pegRatio" in default_key_statistics.keys():
         data["peg_ratio"] = default_key_statistics["pegRatio"]["raw"]
@@ -77,17 +82,15 @@ def humanize_fundamentals(financial_data: dict, default_key_statistics: dict, su
     if "forwardPE" in summary_detail.keys():
         if "raw" in summary_detail["forwardPE"].keys():
             data["pe_forward"] = summary_detail["forwardPE"]["raw"]
-        
+
     data["pe_trailing"] = "N/A"
     if "trailingPE" in summary_detail.keys():
         if "raw" in summary_detail["trailingPE"].keys():
             data["pe_trailing"] = summary_detail["trailingPE"]["raw"]
-        
+
     data["short_float"] = "N/A"
     if "shortRatio" in default_key_statistics.keys():
         if "raw" in default_key_statistics["shortRatio"].keys():
             data["short_float"] = default_key_statistics["shortRatio"]["raw"]
-
-   
 
     return data
