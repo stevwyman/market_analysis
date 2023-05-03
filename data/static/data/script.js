@@ -230,6 +230,20 @@ function generate_chart(data){
 	var ema20values = data.ema20
 	ema20.setData(ema20values);
 	
+	var bb_lower = chart.addLineSeries({
+		color: '#F2A057',
+		lineWidth: 0.5,
+	});
+	var bb_lower_values = data.bb_lower
+	bb_lower.setData(data.bb_lower);
+
+	var bb_upper = chart.addLineSeries({
+		color: '#F2A057',
+		lineWidth: 0.5,
+	});
+	var bb_upper_values = data.bb_upper
+	bb_upper.setData(bb_upper_values);
+
 	if (data.volume.length > 0){
 		var volumeSeries = chart.addHistogramSeries({
 			color: '#26a69a',
@@ -247,7 +261,6 @@ function generate_chart(data){
 		});
 	}
 
-	
 	var candleSeries = chart.addCandlestickSeries({
 	  upColor: 'rgba(0, 150, 136, 0.8)',
 	  downColor: 'rgba(255,82,82, 0.8)',

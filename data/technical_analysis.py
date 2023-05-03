@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Tuple
 from collections import deque
 from statistics import mean, stdev
 from data.models import HistoricData
@@ -65,8 +65,7 @@ class EMA(MovingAverage):
             return (self.__value - self.__ema) / stdev(self._queue)
         return None
     
-
-    
+ 
 class SMA(MovingAverage):
     def __init__(self, length: int):
         super().__init__(length)
@@ -89,6 +88,13 @@ class SMA(MovingAverage):
 
         if len(self._queue) == self._length:
             return (self.__value - self.__sma) / stdev(self._queue)
+        else:
+            return None
+        
+    def stdev(self) -> Optional[float]:
+
+        if len(self._queue) == self._length:
+            return stdev(self._queue)
         else:
             return None
         
@@ -120,6 +126,26 @@ class SMA(MovingAverage):
             return data
         else: 
             raise ValueError("History size not sufficient.")
+
+
+class BollingerBands():
+
+    def __init__(self, window_size: int, std: int):
+        
+        self.__length = window_size
+        self.__std = std
+        self.__ma = SMA(window_size)
+
+    def add(self, value: float) -> Optional[Tuple[float, float]]:
+
+        current_ma = self.__ma.add(value)
+        current_stdev = self.__ma.stdev()
+        if current_stdev is not None:
+            upper_limit = current_ma + current_stdev * self.__std
+            lower_limit = current_ma - current_stdev * self.__std
+            return (lower_limit, upper_limit)
+        else:
+            return None
 
 
 class Hurst():

@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.dateformat import format
 
 from datetime import datetime, date
-from data.technical_analysis import EMA, SMA, Hurst
+from data.technical_analysis import EMA, SMA, Hurst, BollingerBands
 
 import json
 
@@ -539,6 +539,10 @@ def security_history(request, security_id) -> JsonResponse:
             ema20_data = list()
             ema20 = EMA(20)
 
+            bb = BollingerBands(20,2)
+            bb_lower = list()
+            bb_upper = list()
+
             volume_data = list()
 
             previous_close = 0
@@ -577,12 +581,27 @@ def security_history(request, security_id) -> JsonResponse:
                         volume["color"] = RGB_RED
                     volume_data.append(volume)
 
+                bollinger = bb.add(float(entry.close))
+                if bollinger is not None:
+                    bb_lower_entry = {}
+                    bb_lower_entry["time"] = str(entry.date)
+                    bb_lower_entry["value"] = bollinger[0]
+
+                    bb_upper_entry = {}
+                    bb_upper_entry["time"] = str(entry.date)
+                    bb_upper_entry["value"] = bollinger[1]
+
+                    bb_lower.append(bb_lower_entry)
+                    bb_upper.append(bb_upper_entry)
+
                 previous_close = candle["close"]
 
             data["price"] = prices_data
             data["ema50"] = ema50_data
             data["ema20"] = ema20_data
             data["volume"] = volume_data
+            data["bb_upper"] = bb_upper
+            data["bb_lower"] = bb_lower
         else:
             data["error"] = "security not found"
 
