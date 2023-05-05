@@ -121,7 +121,7 @@ class SMA(MovingAverage):
 
 
 class BollingerBands:
-    def __init__(self, window_size: int, std: int):
+    def __init__(self, window_size=20, std=2):
         self.__length = window_size
         self.__std = std
         self.__ma = SMA(window_size)
@@ -133,6 +133,35 @@ class BollingerBands:
             upper_limit = current_ma + current_stdev * self.__std
             lower_limit = current_ma - current_stdev * self.__std
             return (lower_limit, upper_limit)
+        else:
+            return None
+
+
+class MACD:
+    def __init__(self, fast_period=12, slow_period=26, signal_period=9):
+        self.__fast_period = fast_period
+        self.__slow_period = slow_period
+        self.__signal_period = signal_period
+        
+        self.__fast_ma = EMA(fast_period)
+        self.__slow_ma = EMA(slow_period)
+        self.__macd_ma = EMA(signal_period)
+
+    def add(self, value: float) -> Optional[Tuple[float, float, float]]:
+        """
+        returning a tupel with macd line, signal line and histogram
+        """
+        current_fast_ma = self.__fast_ma.add(value)
+        current_slow_ma = self.__slow_ma.add(value)
+
+        if current_slow_ma is not None:
+            macd_line = current_fast_ma - current_slow_ma
+            signal_line = self.__macd_ma.add(macd_line)
+
+            if signal_line is not None:
+                histogram = macd_line - signal_line
+                return (macd_line, signal_line, histogram)
+
         else:
             return None
 

@@ -4,7 +4,7 @@
 {% block body %}
 
 <section class="py-5 text-center container">
-	<h1>{{ security.name }}</h1>
+	<h1>{{ product.name }}</h1>
 	<span class="fs-2 ms-2">{{ price.currency_symbol }}&nbsp;{{ price.price|floatformat:2 }}</span>
 	<span class="fs-4 ms-2 {% if price.change > 0 %} text-success fw-light {% else %} text-danger {% endif %}">{{ price.change|floatformat:2 }}&nbsp;({{ price.change_percent|floatformat:2 }}%)</span>
 	<span class="fs-6 ms-2 fw-light">{% load humanize %}{{ price.local_timestamp|naturaltime }}</span>
@@ -41,39 +41,19 @@
 			</div>
 			<div id="chartContainer">
 				<script>
-					show_history('{{ security.id }}', 'd')
+					show_max_pain('{{ underlying }}')
 				</script>
 			</div>
 		</div>
 		<div class="col col-md-4">
 			<div class="py-2">
-				<ul class="nav nav-tabs">
-					{% if security.type == "EQUITY" %}
-					<li class="nav-item">
-						<a class="nav-link active" id="fa_link" aria-current="page" onClick="show_fa('{{ security.id }}')" href="#">Fundamentals</a>
-					</li>
-					{% endif %}
-					<li class="nav-item">
-					  <a class="nav-link" id="ta_link" onClick="show_ta('{{ security.id }}')" href="#">Technical</a>
-					</li>
-				  </ul>
+				
 			</div>
 			<div class="fs-6 fw-light py-2" >
-				{% if security.type == "EQUITY" %}
-				<p>{{ security.sector}} | {{ security.industry }}</p>
-				{% endif %}
-				<div id="a_data">
-					{% if security.type == "EQUITY" %}
-					<script>
-						show_fa('{{ security.id }}')
-					</script>
-					{% else %}
-					<script>
-						show_ta('{{ security.id }}')
-					</script>
-					{% endif %}
-					
-				</div>
+				<form url="{% url 'open_interest' underlying %}" method="post">
+                    {% csrf_token %}
+                    <input type="submit">
+                </form>
 			</div>
 		</div>
 	</div>
@@ -81,9 +61,6 @@
   	<div class="row bg-light py-1">
 		<div class="col col-md-8">
 			<div class="col py-2">
-				<a class="btn btn-sm btn-outline-primary" href="{% url 'history_update' security.id %}?interval=1d">update daily</a>
-				<a class="btn btn-sm btn-outline-primary" href="{% url 'history_update' security.id %}?interval=1w">update weekly</a>
-				<a class="btn btn-sm btn-outline-primary" href="{% url 'history_update' security.id %}?interval=1mo">update monthly</a>
 			</div>
 		</div>
 		<div class="col col-md-4">
@@ -92,14 +69,6 @@
 			</div>
 		</div>
 	</div>
-</div>
-
-<div class="container">
-	<ul>
-		{% for key, value in quote_summary.items %} 
-		<li>{{key}} - {{value}}</li>
-		{% endfor %}
-	</ul>
 </div>
 
 {% endblock %}

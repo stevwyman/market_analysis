@@ -15,4 +15,8 @@ urlpatterns = [
     path("tp/<int:security_id>", views.technical_parameter, name="technical_parameter"),
     path("ta/<int:security_id>", views.tech_analysis, name="tech_analysis"),
     path("fa/<int:security_id>", views.fundamental_analysis, name="fundamental_analysis"),
+    
+    path("update_all", views.update_all, name="update_all"),
+    path("open_interest/<str:underlying>", views.open_interest, name="open_interest"),
+    path("max_pain/<str:underlying>", views.max_pain, name="max_pain")
 ]

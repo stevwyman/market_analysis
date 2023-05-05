@@ -68,29 +68,33 @@ def humanize_fundamentals(
 ) -> dict():
     data = {}
 
-    data["free_cash_flow"] = "N/A"
-    if "freeCashflow" in financial_data.keys():
-        if "raw" in financial_data["freeCashflow"].keys():
-            data["free_cash_flow"] = financial_data["freeCashflow"]["raw"]
-
-    if "pegRatio" in default_key_statistics.keys():
-        data["peg_ratio"] = default_key_statistics["pegRatio"]["raw"]
-    else:
-        data["peg_ratio"] = "N/A"
-
-    data["pe_forward"] = "N/A"
+    data["PE <sub>forward</sub>"] = "N/A"
     if "forwardPE" in summary_detail.keys():
         if "raw" in summary_detail["forwardPE"].keys():
-            data["pe_forward"] = summary_detail["forwardPE"]["raw"]
+            data["PE <sub>forward</sub>"] = summary_detail["forwardPE"]["raw"]
 
-    data["pe_trailing"] = "N/A"
+    data["PE <sub>trailing</sub>"] = "N/A"
     if "trailingPE" in summary_detail.keys():
         if "raw" in summary_detail["trailingPE"].keys():
-            data["pe_trailing"] = summary_detail["trailingPE"]["raw"]
+            data["PE <sub>trailing</sub>"] = summary_detail["trailingPE"]["raw"]
 
-    data["short_float"] = "N/A"
+    data["Debt to Equity"] = "N/A"
+    if "debtToEquity" in financial_data.keys():
+        if "raw" in financial_data["debtToEquity"].keys():
+            data["Debt to Equity"] = financial_data["debtToEquity"]["raw"]
+
+    if "pegRatio" in default_key_statistics.keys():
+        data["PEG ratio"] = default_key_statistics["pegRatio"]["raw"]
+    else:
+        data["PEG ratio"] = "N/A"
+
+    data["Short <sub>of float</sub>"] = "N/A"
     if "shortRatio" in default_key_statistics.keys():
         if "raw" in default_key_statistics["shortRatio"].keys():
-            data["short_float"] = default_key_statistics["shortRatio"]["raw"]
+            data["Short <sub>of float</sub>"] = default_key_statistics["shortRatio"]["raw"]
+
+    if "recommendationMean" in financial_data.keys() and "recommendationKey" in financial_data.keys():
+        if "raw" in financial_data["recommendationMean"].keys():
+            data[f"Rec <sub>{financial_data['recommendationKey']}</sub>"] = financial_data["recommendationMean"]["raw"]
 
     return data

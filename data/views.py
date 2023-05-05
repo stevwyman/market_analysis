@@ -1,20 +1,20 @@
 from django.core.exceptions import ObjectDoesNotExist
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger, Page
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import DatabaseError, transaction
-from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
-from django.utils.dateformat import format
 
 from datetime import datetime, date
-from data.technical_analysis import EMA, SMA, Hurst, BollingerBands
+from data.technical_analysis import EMA, SMA, BollingerBands, MACD
 
 import json
+import time
 
 from data.OnlineDAO import Online_DAO_Factory, Interval
+from data.open_interest import OnlineReader, LocaleDAO, get_max_pain_history, next_expiry_date, update_data
 from .models import (
     Watchlist,
     Security,
@@ -27,6 +27,15 @@ from .models import (
 )
 from .forms import WatchlistForm, SecurityForm
 from .helper import humanize_price, humanize_fundamentals
+
+UNDERLYINGS = {
+        "COVESTRO": {"name": "Covestro", "productId": 47410, "productGroupId": 9772},
+        "ADIDAS": {"name": "Addidas", "productId": 47634, "productGroupId": 9772},
+        "ALLIANZ": {"name": "Allianz", "productId": 47910, "productGroupId": 9772},
+        "DAX": {"name": "DAX perf.", "productId": 70044, "productGroupId": 13394},
+        "ES50": {"name": "Euro STOXX 50", "productId": 69660, "productGroupId": 13370},
+        "EBF": {"name": "Euro Bund Future", "productId": 70050, "productGroupId": 13328},
+    }
 
 # Create your views here.
 
@@ -87,11 +96,12 @@ def watchlist(request, watchlist_id: int):
         watchlist_entry["security"] = security
         dao = Online_DAO_Factory().get_online_dao(security.data_provider)
         watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
-        watchlist_entry["fundamentals"] = humanize_fundamentals(
-            dao.lookup_financial_data(security),
-            dao.lookup_default_key_statistics(security),
-            dao.lookup_summary_detail(security),
-        )
+        
+        try:
+            watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)["forwardPE"]["raw"]
+        except:
+            watchlist_entry["pe_forward"] = "-"
+
         try:
             history = security.daily_data.all()[:55]
             watchlist_entry["sma"] = SMA(50).latest(history)
@@ -118,11 +128,11 @@ def watchlist(request, watchlist_id: int):
         watchlist_entries.sort(key=lambda x: x["sma"]["sd"], reverse=_b_direction)
     elif order_by == "pef":
         watchlist_entries.sort(
-            key=lambda x: x["fundamentals"]["pe_forward"], reverse=_b_direction
+            key=lambda x: x["pe_forward"], reverse=_b_direction
         )
 
     # pagination
-    paginator = Paginator(watchlist_entries, 10)
+    paginator = Paginator(watchlist_entries, 6)
     page_num = request.GET.get("page", 1)
 
     try:
@@ -141,12 +151,15 @@ def watchlist(request, watchlist_id: int):
             "watchlist": watchlist,
             "watchlist_entries": paged_watchlist_entries,
             "order_by": order_by,
-            "direction": direction,
+            "direction": direction
         },
     )
 
 
 def security(request, security_id):
+    """
+    return a simple security entry with price
+    """
     sec = Security.objects.get(pk=security_id)
 
     # looking up additional information
@@ -155,7 +168,7 @@ def security(request, security_id):
 
     # for testing
     if price["quoteType"] == "EQUITY":
-        quoteSummary = online_dao.lookup_summary_detail(sec)
+        quoteSummary = online_dao.lookup_financial_data(sec)
     else:
         quoteSummary = {}
 
@@ -165,7 +178,8 @@ def security(request, security_id):
         {
             "security": sec,
             "price": humanize_price(price),
-            "quote_summary": quoteSummary,
+            # for testing
+            "quote_summary": quoteSummary
         },
     )
 
@@ -369,6 +383,9 @@ def history_update(request, security_id):
 
 
 def technical_parameter(request, security_id) -> JsonResponse:
+    """
+    generate data for charting of technical charts, i.e. sigma/delta, hurst ...
+    """
     sec = Security.objects.get(pk=security_id)
 
     if request.method == "POST":
@@ -409,6 +426,8 @@ def technical_parameter(request, security_id) -> JsonResponse:
                     hurst_data.append(sd_entry)
 
             data["tp_data"] = hurst_data
+        
+        print(data)
 
         return JsonResponse(data, status=201)
 
@@ -416,6 +435,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
 def tech_analysis(request, security_id) -> JsonResponse:
     """
     generates a dictionary holding the current values for the different technical analysis parameter
+    TODO: RSI, MACD
     """
 
     sec = Security.objects.get(pk=security_id)
@@ -428,22 +448,29 @@ def tech_analysis(request, security_id) -> JsonResponse:
     ema50 = EMA(50)
     ema20 = EMA(20)
 
+    macd = MACD()
+
     daily = sec.daily_data.all()[:1000]
     for entry in reversed(daily):
         close = float(entry.close)
         sma50.add(close)
         ema50_value = ema50.add(close)
         ema20_value = ema20.add(close)
+        macd_value = macd.add(close)
 
-    data["hurst"] = sma50.hurst()
-    data["ema50"] = ema50_value
-    data["ema20"] = ema20_value
-    data["sd"] = sma50.sigma_delta()
+    data["EMA(50)"] = ema50_value
+    data["EMA(20)"] = ema20_value
+    data["MACD <sub>Histogram</sub>"] = macd_value[2]
+    data["MA(50) spread"] = sma50.sigma_delta()
+    data["Hurst value"] = sma50.hurst()
 
     return JsonResponse(data, status=201)
 
 
 def fundamental_analysis(request, security_id) -> JsonResponse:
+    """
+    currently only the data is shown, in a next step we could show the reference by sector as well
+    """
     sec = Security.objects.get(pk=security_id)
     if sec is None:
         return JsonResponse({"error", "security has not been found"}, status=404)
@@ -493,9 +520,12 @@ def security_history(request, security_id) -> JsonResponse:
             ema20_data = list()
             ema20 = EMA(20)
 
-            bb = BollingerBands(20, 2)
+            bb = BollingerBands()
             bb_lower = list()
             bb_upper = list()
+
+            macd = MACD()
+            macd_history_data = list()
 
             volume_data = list()
 
@@ -548,12 +578,21 @@ def security_history(request, security_id) -> JsonResponse:
                     bb_lower.append(bb_lower_entry)
                     bb_upper.append(bb_upper_entry)
 
+                macd_value = macd.add(float(entry.close))
+                if macd_value is not None:
+                    macd_histo_entry = {}
+                    macd_histo_entry["time"] = str(entry.date)
+                    macd_histo_entry["value"] = macd_value[2]
+
+                    macd_history_data.append(macd_histo_entry)
+
                 previous_close = candle["close"]
 
             data["price"] = prices_data
             data["ema50"] = ema50_data
             data["ema20"] = ema20_data
             data["volume"] = volume_data
+            data["macd"] = macd_history_data
             data["bb_upper"] = bb_upper
             data["bb_lower"] = bb_lower
         else:
@@ -584,3 +623,193 @@ def security_history(request, security_id) -> JsonResponse:
         status = 404
 
     return JsonResponse(data, status=status)
+
+
+def update_all(request):
+
+    data = {}
+
+    all_securities = Security.objects.all()
+    counter = 0
+    for security in all_securities:
+        _today = date.today()
+        last_updated = security.dailyupdate_data.all().first()
+
+        if last_updated is not None:
+            if last_updated.date == _today:
+                print(f"no update required for {security}")
+                continue
+            
+        online_dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+
+        # request new history from online dao
+        result = online_dao.lookupHistory(security=security, look_back=5000)
+        if len(result) > 10:
+            try:
+                with transaction.atomic():
+                    # drop current history
+                    Daily.objects.filter(security=security).delete()
+                    try:
+                        DailyUpdate.objects.get(security=security).delete()
+                    except:
+                        pass
+
+                    # crate new history
+                    Daily.objects.bulk_create(result)
+                    DailyUpdate.objects.create(security=security)
+                    messages.info(request, "Daily history has been updated")
+                    
+
+            except DatabaseError as db_error:
+                print(db_error)
+
+        time.sleep(5)
+
+
+    return JsonResponse(data, status=200)
+
+
+def build_data_set(request) -> JsonResponse:
+
+    data = {}
+
+    all_securities = Security.objects.all()
+    counter = 0
+    for security in all_securities:
+        print(f"processing {security}")
+        history = security.daily_data.all()
+
+        prices_data = list()
+        ema50_data = list()
+        ema50 = EMA(50)
+
+        ema20_data = list()
+        ema20 = EMA(20)
+
+        bb = BollingerBands()
+        bb_lower = list()
+        bb_upper = list()
+
+        macd = MACD()
+        macd_history_data = list()
+
+        volume_data = list()
+
+        previous_close = 0
+        for entry in reversed(history):
+            # building the prices data using time and ohlc
+            candle = {}
+            candle["time"] = str(entry.date)
+            candle["open"] = float(entry.open_price)
+            candle["high"] = float(entry.high_price)
+            candle["low"] = float(entry.low)
+            candle["close"] = float(entry.close)
+            prices_data.append(candle)
+
+            ema50_value = ema50.add(float(entry.close))
+            if ema50_value is not None:
+                ema50_entry = {}
+                ema50_entry["time"] = str(entry.date)
+                ema50_entry["value"] = ema50_value
+                ema50_data.append(ema50_entry)
+
+            ema20_value = ema20.add(float(entry.close))
+            if ema20_value is not None:
+                ema20_entry = {}
+                ema20_entry["time"] = str(entry.date)
+                ema20_entry["value"] = ema20_value
+                ema20_data.append(ema20_entry)
+
+            volume_value = float(entry.volume)
+            if volume_value > 0:
+                volume = {}
+                volume["time"] = str(entry.date)
+                volume["value"] = volume_value
+                if candle["close"] >= previous_close:
+                    volume["color"] = RGB_GREEN
+                else:
+                    volume["color"] = RGB_RED
+                volume_data.append(volume)
+
+            bollinger = bb.add(float(entry.close))
+            if bollinger is not None:
+                bb_lower_entry = {}
+                bb_lower_entry["time"] = str(entry.date)
+                bb_lower_entry["value"] = bollinger[0]
+
+                bb_upper_entry = {}
+                bb_upper_entry["time"] = str(entry.date)
+                bb_upper_entry["value"] = bollinger[1]
+
+                bb_lower.append(bb_lower_entry)
+                bb_upper.append(bb_upper_entry)
+
+            macd_value = macd.add(float(entry.close))
+            if macd_value is not None:
+                macd_histo_entry = {}
+                macd_histo_entry["time"] = str(entry.date)
+                macd_histo_entry["value"] = macd_value[2]
+
+                macd_history_data.append(macd_histo_entry)
+
+            previous_close = candle["close"]
+
+        data["price"] = prices_data
+        data["ema50"] = ema50_data
+        data["ema20"] = ema20_data
+        data["volume"] = volume_data
+        data["macd"] = macd_history_data
+        data["bb_upper"] = bb_upper
+        data["bb_lower"] = bb_lower
+        counter += 1 
+
+    return JsonResponse(data, status=200)
+
+
+def open_interest(request, underlying:str):
+
+    if underlying in UNDERLYINGS.keys():
+        product = UNDERLYINGS[underlying]
+    else:
+        messages.error(request, "Underlying not found")
+        return render(request, "data/open_interest.html", {"underlying":underlying})
+
+    if request.method == "GET":
+        pass
+    else:
+        expiry_date = next_expiry_date()
+        parameter = {"product": product, "expiry_date": expiry_date}
+        update_data(parameter)
+
+    return render(request, "data/open_interest.html", {"product":product, "underlying":underlying})
+
+
+def max_pain(request, underlying:str) -> JsonResponse:
+    """
+    returning a (time:value) dictionary showing the maxpain value by date
+    """
+    data = {}
+    if underlying in UNDERLYINGS.keys():
+        product = UNDERLYINGS[underlying]
+    else:
+        data["error"] = "underlying not found"
+        return JsonResponse(data, status=404)
+    
+    expiry_date = next_expiry_date()
+    parameter = {"product": product, "expiry_date": expiry_date}
+
+    max_pain_over_time = sorted(
+        get_max_pain_history(parameter), key=lambda x: x[0], reverse=False
+    )
+
+    mp = list()
+
+    for max_pain in max_pain_over_time:
+        entry = {}
+        entry["time"] = max_pain[0]
+        entry["value"] = max_pain[1]
+        mp.append(entry)
+
+    data["max_pain"] = mp
+
+    return JsonResponse(data, status=200)

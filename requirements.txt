@@ -3,3 +3,5 @@ django-bootstrap5
 urllib3
 numpy
 pymongo
+beautifulsoup4
+lxml

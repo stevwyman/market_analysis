@@ -6,6 +6,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 });
 
+/**
+ * Note: make sure the data is sorted correctly, else it will not show and give a value is null error!
+ */
+
 function show_history(security_id, parameter){
 
     fetch("/data/security_history/" + security_id, {
@@ -49,6 +53,7 @@ function show_tp(security_id, parameter){
 
         if (response.ok){
             response.json().then( data => {
+				console.log(data.tp_data)
                 generate_tp_chart(data)
             })
         } else {
@@ -234,32 +239,49 @@ function generate_chart(data){
 		color: '#F2A057',
 		lineWidth: 0.5,
 	});
-	var bb_lower_values = data.bb_lower
 	bb_lower.setData(data.bb_lower);
 
 	var bb_upper = chart.addLineSeries({
 		color: '#F2A057',
 		lineWidth: 0.5,
 	});
-	var bb_upper_values = data.bb_upper
-	bb_upper.setData(bb_upper_values);
+	bb_upper.setData(data.bb_upper);
+
+
+	var macdHistogram = chart.addHistogramSeries({
+		color: '#F2A057',
+		priceFormat: {
+			type: 'volume',
+		},
+		priceScaleId: 'MACD',
+	});
+	macdHistogram.setData(data.macd);
+	chart.priceScale('MACD').applyOptions({
+		scaleMargins: {
+			top: 0,
+			bottom: 0.8,
+		},
+	});
+	
 
 	if (data.volume.length > 0){
 		var volumeSeries = chart.addHistogramSeries({
-			color: '#26a69a',
+			color: '#F2A057',
 			priceFormat: {
 				type: 'volume',
 			},
-			priceScaleId: '',
+			priceScaleId: 'volume',
 		});
 		volumeSeries.setData(data.volume);
-		chart.priceScale('').applyOptions({
+		chart.priceScale('volume').applyOptions({
 			scaleMargins: {
 				top: 0.8,
 				bottom: 0,
 			},
 		});
 	}
+
+
 
 	var candleSeries = chart.addCandlestickSeries({
 	  upColor: 'rgba(0, 150, 136, 0.8)',
@@ -301,7 +323,6 @@ function generate_tp_chart(data){
     var width = 800;
     var height = 450;
 
-	
     document.querySelector("#chartContainer").innerHTML = ''
 
     var chart = LightweightCharts.createChart(document.querySelector("#chartContainer"), {
@@ -377,6 +398,96 @@ function generate_tp_chart(data){
 	} else {
 		
 	}
+
+	// Make Chart Responsive with screen resize
+	const resizeObserver = new ResizeObserver(entries => {
+		if (entries.length === 0 || entries[0].target !== chartContainer) { return }
+		const newRect = entries[0].contentRect
+		chart.applyOptions({ height: newRect.height, width: newRect.width })
+		})
+	resizeObserver.observe(chartContainer)
+}
+
+
+function show_max_pain(underlying){
+	fetch("/data/max_pain/" + underlying, {
+        method: "GET",
+        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
+        mode: "same-origin"
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+				generate_max_pain_chart(data)
+
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+}
+
+
+function generate_max_pain_chart(data){
+
+	const chartOptions = {
+		width: 800,
+		height: 450,
+		layout: {
+			background: {
+				type: 'solid',
+				color: 'white',
+			},
+			textColor: 'rgba(47, 79, 79, 0.9)',
+		},
+		grid: {
+			vertLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+			horzLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+		},
+		crosshair: {
+			mode: LightweightCharts.CrosshairMode.Normal,
+		},
+		rightPriceScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		timeScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		/*
+		watermark: {
+			visible: true,
+			fontSize: 32,
+			horzAlign: 'center',
+			vertAlign: 'center',
+			color: 'rgba(171, 71, 188, 0.3)',
+			text: 'wyca-analytics.com',
+		},
+		*/
+	}
+
+	const chart = LightweightCharts.createChart(document.getElementById("chartContainer"), chartOptions);
+	
+	const series = chart.addLineSeries({
+		color: '#2962FF',
+		lineWidth: 2,
+		// disabling built-in price lines
+		lastValueVisible: false,
+		priceLineVisible: false,
+	});
+	series.setData(data.max_pain);
+
+	chart.timeScale().fitContent();
 
 	// Make Chart Responsive with screen resize
 	const resizeObserver = new ResizeObserver(entries => {
