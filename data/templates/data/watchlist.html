@@ -14,11 +14,25 @@
                     <th scope="col" class="d-table-cell d-sm-none">Symbol</th>
                     <th scope="col" class="d-none d-sm-table-cell">Name</th>
                     <th scope="col" class="d-none d-sm-table-cell">latest</th>
-                    <th scope="col">change<br>(<a href="?order_by=change&direction=desc">&darr;</a><a href="?order_by=change&direction=asc">&uarr;</a>)</th>
-                    <th scope="col" class="d-none d-sm-table-cell">PE<sub>forward</sub><br>(<a href="?order_by=pef&direction=desc">&darr;</a><a href="?order_by=pef&direction=asc">&uarr;</a>)</th>
+                    <th scope="col">
+                        change
+                        {% if watchlist is not None %}
+                        <br>(<a href="?order_by=change&direction=desc">&darr;</a><a href="?order_by=change&direction=asc">&uarr;</a>)</th>
+                        {% endif %}
+                    <th scope="col" class="d-none d-sm-table-cell">
+                        PE<sub>forward</sub>
+                        {% if watchlist is not None %}
+                        <br>(<a href="?order_by=pef&direction=desc">&darr;</a><a href="?order_by=pef&direction=asc">&uarr;</a>)</th>
+                        {% endif %}
                     <th scope="col" class="d-none d-sm-table-cell">SMA(50)</th>
-                    <th scope="col">spread<br>(<a href="?order_by=spread&direction=desc">&darr;</a><a href="?order_by=spread&direction=asc">&uarr;</a>)</th>
-                    <th scope="col">Hurst<br>(<a href="?order_by=hurst&direction=desc">&darr;</a><a href="?order_by=hurst&direction=asc">&uarr;</a>)</th>
+                    <th scope="col">spread
+                        {% if watchlist is not None %}
+                        <br>(<a href="?order_by=spread&direction=desc">&darr;</a><a href="?order_by=spread&direction=asc">&uarr;</a>)</th>
+                        {% endif %}
+                    <th scope="col">Hurst
+                        {% if watchlist is not None %}
+                        <br>(<a href="?order_by=hurst&direction=desc">&darr;</a><a href="?order_by=hurst&direction=asc">&uarr;</a>)</th>
+                        {% endif %}
                     <th scope="col" class="d-none d-sm-table-cell"></th>
                 </tr>
             </thead>
@@ -34,11 +48,15 @@
                     <td class="text-end">{{ watchlist_entry.sma.sd|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.hurst|floatformat:2 }}</td>
                     <td class="text-end d-none d-sm-table-cell">
+                        {% if watchlist is not None %}
                         <form action="{% url 'security_drop' watchlist.id %}" method="post">
                             {% csrf_token %}
                             <input type="hidden" name="security_id" value="{{watchlist_entry.security.id}}">
                             <input class="btn btn-outline-warning btn-sm" type="submit" value="drop">
                         </form>
+                        {% else %}
+                            &nbsp;
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -47,11 +65,12 @@
     </div>
     
 </div>
-
+{% if watchlist is not None %}
 <div class="container">
     <div class="row justify-content-md-center">
         <div class="col-9">{% include "data/pagination.html" %}</div><div class="col-3"><a class="btn btn-outline-warning btn-sm" href="{% url 'security_new' watchlist.id %}">+</a></div>
     </div>
 </div>
+{% endif %}
 
 {% endblock %}

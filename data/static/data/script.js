@@ -224,6 +224,7 @@ function generate_chart(data){
 	var ema50 = chart.addLineSeries({
 		color: 'rgba(4, 111, 232, 1)',
 		lineWidth: 2,
+		priceLineVisible: false
 	});
 	var ema50values = data.ema50
 	ema50.setData(ema50values);
@@ -231,6 +232,7 @@ function generate_chart(data){
 	var ema20 = chart.addLineSeries({
 		color: 'rgba(4, 111, 232, 1)',
 		lineWidth: 1,
+		priceLineVisible: false
 	});
 	var ema20values = data.ema20
 	ema20.setData(ema20values);
@@ -238,12 +240,14 @@ function generate_chart(data){
 	var bb_lower = chart.addLineSeries({
 		color: '#F2A057',
 		lineWidth: 0.5,
+		priceLineVisible: false
 	});
 	bb_lower.setData(data.bb_lower);
 
 	var bb_upper = chart.addLineSeries({
 		color: '#F2A057',
 		lineWidth: 0.5,
+		priceLineVisible: false
 	});
 	bb_upper.setData(data.bb_upper);
 
@@ -254,6 +258,7 @@ function generate_chart(data){
 			type: 'volume',
 		},
 		priceScaleId: 'MACD',
+		priceLineVisible: false
 	});
 	macdHistogram.setData(data.macd);
 	chart.priceScale('MACD').applyOptions({

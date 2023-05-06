@@ -11,8 +11,6 @@ class MovingAverage:
     def __init__(self, length: int):
         # ma length
         self._length = length
-
-        self._value = 0.0
         self._queue: deque = deque(maxlen=length)
 
     def queue(self) -> deque:
@@ -31,9 +29,7 @@ class EMA(MovingAverage):
     def __init__(self, length: int):
         super().__init__(length)
 
-        self.__length = length
         self.__factor = float(2 / (1 + length))
-        self.__ema = 0.0
         self.__ema_reached = False
 
     def add(self, value: float) -> Optional[float]:
@@ -57,18 +53,10 @@ class EMA(MovingAverage):
                 self.__ema = mean(self._queue)
             return None
 
-    def sigma_delta(self) -> Optional[float]:
-        if self.__ema_reached:
-            return (self.__value - self.__ema) / stdev(self._queue)
-        return None
-
 
 class SMA(MovingAverage):
     def __init__(self, length: int):
         super().__init__(length)
-
-        self.__length = length
-        self.__sma = 0.0
 
     def add(self, value: float) -> float:
         """
@@ -102,7 +90,7 @@ class SMA(MovingAverage):
             return None
 
     def latest(self, history: QuerySet[HistoricData]) -> dict:
-        if history.count() > self.__length:
+        if history.count() > self._length:
             data = {}
             r_history = list()
             for entry in reversed(history):
@@ -111,7 +99,7 @@ class SMA(MovingAverage):
                 # print(f"{entry.date} {entry.close}")
             data["sma"] = self.__sma
             data["sd"] = self.sigma_delta()
-            data["length"] = self.__length
+            data["length"] = self._length
             hurst = Hurst()
             data["hurst"] = hurst.hurst(r_history)
 
@@ -164,6 +152,35 @@ class MACD:
 
         else:
             return None
+
+
+class RSI:
+    def __init__(self, period=14):
+        self.__previous = None
+        self.__gain_sma = SMA(period)
+        self.__loss_sma = SMA(period)
+
+    def add(self, value: float) -> Optional[float]:
+        
+        if self.__previous is None:
+            self.__previous = value
+            return None
+        else:
+            # Calculate price change and gain/loss
+            delta = value - self.__previous
+            gain = max(0, delta)
+            loss = max(0, -delta)
+
+            # Calculate average gain and loss
+            avg_gain = self.__gain_sma.add(gain)
+            avg_loss = self.__loss_sma.add(loss)
+
+            self.__previous = value
+
+            if avg_gain != 0 and avg_loss != 0:
+                return 100 - (100 / (1 + (avg_gain / avg_loss)))
+            else:
+                return None
 
 
 class Hurst:

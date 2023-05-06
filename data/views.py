@@ -3,12 +3,13 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import DatabaseError, transaction
+from django.db.models import Q
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 
 from datetime import datetime, date
-from data.technical_analysis import EMA, SMA, BollingerBands, MACD
+from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI
 
 import json
 import time
@@ -28,14 +29,7 @@ from .models import (
 from .forms import WatchlistForm, SecurityForm
 from .helper import humanize_price, humanize_fundamentals
 
-UNDERLYINGS = {
-        "COVESTRO": {"name": "Covestro", "productId": 47410, "productGroupId": 9772},
-        "ADIDAS": {"name": "Addidas", "productId": 47634, "productGroupId": 9772},
-        "ALLIANZ": {"name": "Allianz", "productId": 47910, "productGroupId": 9772},
-        "DAX": {"name": "DAX perf.", "productId": 70044, "productGroupId": 13394},
-        "ES50": {"name": "Euro STOXX 50", "productId": 69660, "productGroupId": 13370},
-        "EBF": {"name": "Euro Bund Future", "productId": 70050, "productGroupId": 13328},
-    }
+
 
 # Create your views here.
 
@@ -167,10 +161,13 @@ def security(request, security_id):
     price = online_dao.lookupPrice(sec.symbol)
 
     # for testing
+    """
     if price["quoteType"] == "EQUITY":
         quoteSummary = online_dao.lookup_financial_data(sec)
     else:
         quoteSummary = {}
+    """
+
 
     return render(
         request,
@@ -179,7 +176,7 @@ def security(request, security_id):
             "security": sec,
             "price": humanize_price(price),
             # for testing
-            "quote_summary": quoteSummary
+            # "quote_summary": quoteSummary
         },
     )
 
@@ -304,6 +301,59 @@ def security_drop(request, watchlist_id):
         reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
     )
 
+
+def security_search(request) -> JsonResponse:
+
+    data = {}
+
+    if request.method == "POST":
+
+        query = request.POST["id"]
+
+        results = list()
+        securities = Security.objects.filter(Q(name__contains=query) | Q(symbol__contains=query))
+        print(f"found {securities.count()} entries for {query}")
+
+        if securities.count() == 1:
+            # go directly to the identified security
+            security = securities.first()
+            return HttpResponseRedirect(
+                    reverse("security", kwargs={"security_id": security.id})
+                )
+
+        else:
+            if securities.count() == 0:
+                messages.warning(request, "could not find a matching security")
+            else:
+
+                watchlist_entries = list()
+                for security in securities:
+                    watchlist_entry = {}
+                    watchlist_entry["security"] = security
+                    dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+                    watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
+                    
+                    try:
+                        watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)["forwardPE"]["raw"]
+                    except:
+                        watchlist_entry["pe_forward"] = "-"
+
+                    try:
+                        history = security.daily_data.all()[:55]
+                        watchlist_entry["sma"] = SMA(50).latest(history)
+                    except ValueError as va:
+                        messages.warning(request, va)
+
+                    watchlist_entries.append(watchlist_entry)
+
+                return render(
+                    request,
+                    "data/watchlist.html",
+                    {
+                        "watchlist_entries": watchlist_entries,
+                    },
+                )
+    
 
 def history_update(request, security_id):
     sec = Security.objects.get(pk=security_id)
@@ -449,6 +499,7 @@ def tech_analysis(request, security_id) -> JsonResponse:
     ema20 = EMA(20)
 
     macd = MACD()
+    rsi = RSI()
 
     daily = sec.daily_data.all()[:1000]
     for entry in reversed(daily):
@@ -457,10 +508,12 @@ def tech_analysis(request, security_id) -> JsonResponse:
         ema50_value = ema50.add(close)
         ema20_value = ema20.add(close)
         macd_value = macd.add(close)
+        rsi_value = rsi.add(close)
 
     data["EMA(50)"] = ema50_value
     data["EMA(20)"] = ema20_value
     data["MACD <sub>Histogram</sub>"] = macd_value[2]
+    data["RSI"] = rsi_value
     data["MA(50) spread"] = sma50.sigma_delta()
     data["Hurst value"] = sma50.hurst()
 
@@ -670,14 +723,18 @@ def update_all(request):
 
 
 def build_data_set(request) -> JsonResponse:
-
+    """
+    building a data structure that can be used as input for an AI algorithm
+    """
     data = {}
 
     all_securities = Security.objects.all()
     counter = 0
+    for index, item in enumerate(all_securities):   # default is zero
+        print(index, item)
     for security in all_securities:
         print(f"processing {security}")
-        history = security.daily_data.all()
+        history = security.daily_data.all().order_by('-date')
 
         prices_data = list()
         ema50_data = list()
@@ -766,19 +823,31 @@ def build_data_set(request) -> JsonResponse:
     return JsonResponse(data, status=200)
 
 
+#
+# section for open interest
+#
+underlyings = {
+        "COVESTRO": {"name": "Covestro", "productId": 47410, "productGroupId": 9772},
+        "ADIDAS": {"name": "Addidas", "productId": 47634, "productGroupId": 9772},
+        "ALLIANZ": {"name": "Allianz", "productId": 47910, "productGroupId": 9772},
+        "DAX": {"name": "DAX perf.", "productId": 70044, "productGroupId": 13394},
+        "ES50": {"name": "Euro STOXX 50", "productId": 69660, "productGroupId": 13370},
+        "EBF": {"name": "Euro Bund Future", "productId": 70050, "productGroupId": 13328},
+    }
+
+
 def open_interest(request, underlying:str):
 
-    if underlying in UNDERLYINGS.keys():
-        product = UNDERLYINGS[underlying]
+    if underlying in underlyings.keys():
+        product = underlyings[underlying]
     else:
         messages.error(request, "Underlying not found")
         return render(request, "data/open_interest.html", {"underlying":underlying})
 
-    if request.method == "GET":
-        pass
-    else:
+    if request.method == "POST":
         expiry_date = next_expiry_date()
         parameter = {"product": product, "expiry_date": expiry_date}
+        messages.info(request, "Data has been updated")
         update_data(parameter)
 
     return render(request, "data/open_interest.html", {"product":product, "underlying":underlying})
@@ -789,8 +858,8 @@ def max_pain(request, underlying:str) -> JsonResponse:
     returning a (time:value) dictionary showing the maxpain value by date
     """
     data = {}
-    if underlying in UNDERLYINGS.keys():
-        product = UNDERLYINGS[underlying]
+    if underlying in underlyings.keys():
+        product = underlyings[underlying]
     else:
         data["error"] = "underlying not found"
         return JsonResponse(data, status=404)

@@ -45,8 +45,9 @@
                             <a class="nav-link disabled">Link</a>
                         </li>
                     </ul>
-                    <form class="d-flex" role="search">
-                        <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search">
+                    <form autocomplete="off" class="d-flex" role="search" id="search_form" action="{% url 'security_search' %}" method="post">
+                        {% csrf_token %}
+                        <input class="form-control me-2" type="search" placeholder="Search" name="id" aria-label="Search" minlength="2">
                         <button class="btn btn-outline-light" type="submit">Search</button>
                     </form>
                 </div>
