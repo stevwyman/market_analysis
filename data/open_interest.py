@@ -3,13 +3,9 @@ import pymongo
 import configparser
 from bs4 import BeautifulSoup
 from lxml import etree
-from tabulate import tabulate
 from datetime import date, datetime, timedelta
-from sys import exit
 import time
 import calendar
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 
 DATE_FORMAT = "%Y%m%d"
 
@@ -80,14 +76,14 @@ class LocaleDAO:
     def __init__(self):
         config = configparser.ConfigParser()
         config.read("config.ini")
-        self._client = pymongo.MongoClient(config.get("DB","url"))
+        self._client = pymongo.MongoClient(config.get("DB", "url"))
         try:
             self._client.server_info()
         except pymongo.errors.ServerSelectionTimeoutError:
             exit("Mongo instance not reachable.")
 
-        self._db = self._client[config.get("DB.OI","db")]
-        self._collection = self._db[config.get("DB.OI","collection")]
+        self._db = self._client[config.get("DB.OI", "db")]
+        self._collection = self._db[config.get("DB.OI", "collection")]
 
     def write(self, open_interest_data: dict) -> None:
         try:
@@ -187,33 +183,6 @@ def update_data(parameter: dict) -> None:
             )
 
     locale_dao.close
-
-
-def generate_max_pain_chart(parameter: dict) -> None:
-    max_pain_over_time = sorted(
-        get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
-    )
-
-    values = [max_pain[1] for max_pain in max_pain_over_time]
-    names = [max_pain[0] for max_pain in max_pain_over_time]
-
-    plt.title(
-        f'{parameter["product"]["name"]} {parameter["expiry_date"]["month"]}.{parameter["expiry_date"]["year"]} {max_pain_over_time[0][1]}'
-    )
-    plt.ylabel("Strike")
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%d.%m.%Y"))
-    plt.step(names, values)
-    plt.gcf().autofmt_xdate()
-    plt.show()
-
-
-def generate_max_pain_history(parameter: dict) -> None:
-    max_pain_over_time = sorted(
-        get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
-    )
-
-    header = ["Date", "Strike", "Value"]
-    print(tabulate(max_pain_over_time, headers=header, tablefmt="fancy_grid"))
 
 
 def get_max_pain_history(parameter: dict) -> list:
@@ -382,17 +351,8 @@ def get_most_recent_distribution(parameter: dict) -> None:
         if mp < max_level and mp > min_level:
             max_pain_filtered[mp] = max_pain[mp]
 
-    plt.title(
-        f'{parameter["product"]["name"]} {parameter["expiry_date"]["month"]}.{parameter["expiry_date"]["year"]} {max_pain_over_time[0][1]}'
-    )
-    plt.ylabel("Value")
-    # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%d.%m.%Y"))
-    plt.step(max_pain_filtered.keys(), max_pain_filtered.values())
-    plt.gcf().autofmt_xdate()
-    plt.show()
 
-
-def generate_most_distribution(parameter: dict) -> None:
+def generate_most_distribution(parameter: dict) -> dict:
     """
     generate a chart showing for the specified business date the distribution of calls and puts
     """
@@ -417,9 +377,13 @@ def generate_most_distribution(parameter: dict) -> None:
         put_labels.append(put[0])
         put_values.append(put[2])
 
-    plt.barh(call_labels, call_values, height=20)
-    plt.barh(put_labels, put_values, height=20)
-    plt.show()
+    data = {}
+    data["call_labels"] = call_labels
+    data["call_values"] = call_values
+    data["put_labels"] = put_labels
+    data["put_values"] = put_values
+
+    return data
 
 
 def generate_unique_filter(parameter: dict) -> dict:

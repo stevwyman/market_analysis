@@ -15,8 +15,8 @@ on the db model, we might want to use views on the history data to create a view
 # build an image for the cloud container
 docker buildx build --platform=linux/amd64 -t market_analysis .
 
-docker tag market_analysis YOUR_DOCKERHUB_NAME/market_analysis
-docker push YOUR_DOCKERHUB_NAME/market_analysis
+docker tag market_analysis -/market_analysis
+docker push -/market_analysis
 
 # create an internal network for the images
 docker network create analysis_net

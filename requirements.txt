@@ -5,5 +5,3 @@ numpy
 pymongo
 beautifulsoup4
 lxml
-tabulate
-matplotlib

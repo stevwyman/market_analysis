@@ -15,7 +15,12 @@ import json
 import time
 
 from data.OnlineDAO import Online_DAO_Factory, Interval
-from data.open_interest import OnlineReader, LocaleDAO, get_max_pain_history, next_expiry_date, update_data
+from data.open_interest import (
+    get_max_pain_history,
+    next_expiry_date,
+    update_data,
+    generate_most_distribution,
+)
 from .models import (
     Watchlist,
     Security,
@@ -28,7 +33,6 @@ from .models import (
 )
 from .forms import WatchlistForm, SecurityForm
 from .helper import humanize_price, humanize_fundamentals
-
 
 
 # Create your views here.
@@ -90,9 +94,11 @@ def watchlist(request, watchlist_id: int):
         watchlist_entry["security"] = security
         dao = Online_DAO_Factory().get_online_dao(security.data_provider)
         watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
-        
+
         try:
-            watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)["forwardPE"]["raw"]
+            watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)[
+                "forwardPE"
+            ]["raw"]
         except:
             watchlist_entry["pe_forward"] = "-"
 
@@ -121,9 +127,7 @@ def watchlist(request, watchlist_id: int):
     elif order_by == "spread":
         watchlist_entries.sort(key=lambda x: x["sma"]["sd"], reverse=_b_direction)
     elif order_by == "pef":
-        watchlist_entries.sort(
-            key=lambda x: x["pe_forward"], reverse=_b_direction
-        )
+        watchlist_entries.sort(key=lambda x: x["pe_forward"], reverse=_b_direction)
 
     # pagination
     paginator = Paginator(watchlist_entries, 6)
@@ -145,7 +149,7 @@ def watchlist(request, watchlist_id: int):
             "watchlist": watchlist,
             "watchlist_entries": paged_watchlist_entries,
             "order_by": order_by,
-            "direction": direction
+            "direction": direction,
         },
     )
 
@@ -167,7 +171,6 @@ def security(request, security_id):
     else:
         quoteSummary = {}
     """
-
 
     return render(
         request,
@@ -303,38 +306,41 @@ def security_drop(request, watchlist_id):
 
 
 def security_search(request) -> JsonResponse:
-
     data = {}
 
     if request.method == "POST":
-
         query = request.POST["id"]
 
         results = list()
-        securities = Security.objects.filter(Q(name__contains=query) | Q(symbol__contains=query))
+        securities = Security.objects.filter(
+            Q(name__contains=query) | Q(symbol__contains=query)
+        )
         print(f"found {securities.count()} entries for {query}")
 
         if securities.count() == 1:
             # go directly to the identified security
             security = securities.first()
             return HttpResponseRedirect(
-                    reverse("security", kwargs={"security_id": security.id})
-                )
+                reverse("security", kwargs={"security_id": security.id})
+            )
 
         else:
             if securities.count() == 0:
                 messages.warning(request, "could not find a matching security")
             else:
-
                 watchlist_entries = list()
                 for security in securities:
                     watchlist_entry = {}
                     watchlist_entry["security"] = security
                     dao = Online_DAO_Factory().get_online_dao(security.data_provider)
-                    watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
-                    
+                    watchlist_entry["price"] = humanize_price(
+                        dao.lookupPrice(security.symbol)
+                    )
+
                     try:
-                        watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)["forwardPE"]["raw"]
+                        watchlist_entry["pe_forward"] = dao.lookup_summary_detail(
+                            security
+                        )["forwardPE"]["raw"]
                     except:
                         watchlist_entry["pe_forward"] = "-"
 
@@ -353,7 +359,7 @@ def security_search(request) -> JsonResponse:
                         "watchlist_entries": watchlist_entries,
                     },
                 )
-    
+
 
 def history_update(request, security_id):
     sec = Security.objects.get(pk=security_id)
@@ -476,7 +482,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
                     hurst_data.append(sd_entry)
 
             data["tp_data"] = hurst_data
-        
+
         print(data)
 
         return JsonResponse(data, status=201)
@@ -679,7 +685,6 @@ def security_history(request, security_id) -> JsonResponse:
 
 
 def update_all(request):
-
     data = {}
 
     all_securities = Security.objects.all()
@@ -692,7 +697,7 @@ def update_all(request):
             if last_updated.date == _today:
                 print(f"no update required for {security}")
                 continue
-            
+
         online_dao = Online_DAO_Factory().get_online_dao(security.data_provider)
 
         # request new history from online dao
@@ -711,13 +716,11 @@ def update_all(request):
                     Daily.objects.bulk_create(result)
                     DailyUpdate.objects.create(security=security)
                     messages.info(request, "Daily history has been updated")
-                    
 
             except DatabaseError as db_error:
                 print(db_error)
 
         time.sleep(5)
-
 
     return JsonResponse(data, status=200)
 
@@ -730,11 +733,11 @@ def build_data_set(request) -> JsonResponse:
 
     all_securities = Security.objects.all()
     counter = 0
-    for index, item in enumerate(all_securities):   # default is zero
+    for index, item in enumerate(all_securities):  # default is zero
         print(index, item)
     for security in all_securities:
         print(f"processing {security}")
-        history = security.daily_data.all().order_by('-date')
+        history = security.daily_data.all().order_by("-date")
 
         prices_data = list()
         ema50_data = list()
@@ -818,7 +821,7 @@ def build_data_set(request) -> JsonResponse:
         data["macd"] = macd_history_data
         data["bb_upper"] = bb_upper
         data["bb_lower"] = bb_lower
-        counter += 1 
+        counter += 1
 
     return JsonResponse(data, status=200)
 
@@ -827,33 +830,55 @@ def build_data_set(request) -> JsonResponse:
 # section for open interest
 #
 underlyings = {
-        "COVESTRO": {"name": "Covestro", "productId": 47410, "productGroupId": 9772},
-        "ADIDAS": {"name": "Addidas", "productId": 47634, "productGroupId": 9772},
-        "ALLIANZ": {"name": "Allianz", "productId": 47910, "productGroupId": 9772},
-        "DAX": {"name": "DAX perf.", "productId": 70044, "productGroupId": 13394},
-        "ES50": {"name": "Euro STOXX 50", "productId": 69660, "productGroupId": 13370},
-        "EBF": {"name": "Euro Bund Future", "productId": 70050, "productGroupId": 13328},
-    }
+    "COVESTRO": {"name": "Covestro", "productId": 47410, "productGroupId": 9772},
+    "ADIDAS": {"name": "Addidas", "productId": 47634, "productGroupId": 9772},
+    "ALLIANZ": {"name": "Allianz", "productId": 47910, "productGroupId": 9772},
+    "DAX": {"name": "DAX perf.", "productId": 70044, "productGroupId": 13394},
+    "ES50": {"name": "Euro STOXX 50", "productId": 69660, "productGroupId": 13370},
+    "EBF": {"name": "Euro Bund Future", "productId": 70050, "productGroupId": 13328},
+}
 
 
-def open_interest(request, underlying:str):
-
+def open_interest(request, underlying: str):
     if underlying in underlyings.keys():
         product = underlyings[underlying]
-    else:
-        messages.error(request, "Underlying not found")
-        return render(request, "data/open_interest.html", {"underlying":underlying})
-
-    if request.method == "POST":
         expiry_date = next_expiry_date()
         parameter = {"product": product, "expiry_date": expiry_date}
+        max_pain_over_time = sorted(
+            get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
+        )
+        most_recent = {}
+        if len(max_pain_over_time) > 0:
+            latest = max_pain_over_time[0]
+            most_recent["ts"] = latest[0]
+            most_recent["strike"] = latest[1]
+        else:
+            messages.warning(request, "no data found")
+    else:
+        messages.error(request, "Underlying not found")
+        return HttpResponseRedirect(reverse("watchlists"))
+
+    # using POST for requesting an update of data
+    if request.method == "POST":
         messages.info(request, "Data has been updated")
         update_data(parameter)
+        return HttpResponseRedirect(
+            reverse("open_interest", kwargs={"underlying": underlying})
+        )
 
-    return render(request, "data/open_interest.html", {"product":product, "underlying":underlying})
+    return render(
+        request,
+        "data/open_interest.html",
+        {
+            "underlying": underlying,
+            "product": product,
+            "latest": most_recent,
+            "underlyings": underlyings,
+        },
+    )
 
 
-def max_pain(request, underlying:str) -> JsonResponse:
+def max_pain(request, underlying: str) -> JsonResponse:
     """
     returning a (time:value) dictionary showing the maxpain value by date
     """
@@ -863,7 +888,7 @@ def max_pain(request, underlying:str) -> JsonResponse:
     else:
         data["error"] = "underlying not found"
         return JsonResponse(data, status=404)
-    
+
     expiry_date = next_expiry_date()
     parameter = {"product": product, "expiry_date": expiry_date}
 
@@ -882,3 +907,22 @@ def max_pain(request, underlying:str) -> JsonResponse:
     data["max_pain"] = mp
 
     return JsonResponse(data, status=200)
+
+
+def max_pain_distribution(request, underlying: str) -> JsonResponse:
+    """
+    returning a dataset showing the distribution over strikes for a specific day
+    """
+    data = {}
+    if underlying in underlyings.keys():
+        product = underlyings[underlying]
+    else:
+        data["error"] = "underlying not found"
+        return JsonResponse(data, status=404)
+
+    expiry_date = next_expiry_date()
+    parameter = {"product": product, "expiry_date": expiry_date}
+
+    distribution = generate_most_distribution(parameter)
+
+    return JsonResponse(distribution, status=200)

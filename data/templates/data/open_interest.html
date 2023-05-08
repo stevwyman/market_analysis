@@ -5,13 +5,7 @@
 
 <section class="py-5 text-center container">
 	<h1>{{ product.name }}</h1>
-	<span class="fs-2 ms-2">{{ price.currency_symbol }}&nbsp;{{ price.price|floatformat:2 }}</span>
-	<span class="fs-4 ms-2 {% if price.change > 0 %} text-success fw-light {% else %} text-danger {% endif %}">{{ price.change|floatformat:2 }}&nbsp;({{ price.change_percent|floatformat:2 }}%)</span>
-	<span class="fs-6 ms-2 fw-light">{% load humanize %}{{ price.local_timestamp|naturaltime }}</span>
-
-	{% if price.additional_data is not None %}
-  	<p class="fs-6">{{ price.additional_data.state}}: {{ price.currency_symbol }}&nbsp;{{ price.additional_data.price|floatformat:2 }} {{ price.additional_data.change|floatformat:2 }}&nbsp;({{ price.additional_data.change_percent|floatformat:2 }}%) {% load humanize %}{{ price.additional_data.local_timestamp|naturaltime }}</p>
-	{% endif %}
+	<span class="fs-2 ms-2">{% load humanize %}{{ latest.ts|naturaltime }} - {{ latest.strike }}</span>
 </section>
 
 {% csrf_token %}
@@ -20,25 +14,6 @@
 
 	<div class="row py-1">
 		<div class="col col-md-8">
-			<div class="py-2">
-				<ul class="nav nav-tabs">
-					<li class="nav-item">
-						<a class="nav-link" id="nl_daily" onClick="show_history('{{ security.id }}', 'd')" href="#">Daily</a>
-					</li>
-					<li class="nav-item">
-						<a class="nav-link" id="nl_weekly" onClick="show_history('{{ security.id }}', 'w')" href="#">Weekly</a>
-					</li>
-					<li class="nav-item">
-						<a class="nav-link" id="nl_monthly" onClick="show_history('{{ security.id }}', 'm')" href="#">Monthly</a>
-					</li>
-					<li class="nav-item">
-						<a class="nav-link" id="nl_hurst" onClick="show_tp('{{ security.id }}', 'hurst')" href="#">Hurst</a>
-					</li>
-					<li class="nav-item">
-						<a class="nav-link" id="nl_sd" onClick="show_tp('{{ security.id }}', 'sd')" href="#">SD</a>
-					</li>
-				  </ul>
-			</div>
 			<div id="chartContainer">
 				<script>
 					show_max_pain('{{ underlying }}')
@@ -46,29 +21,18 @@
 			</div>
 		</div>
 		<div class="col col-md-4">
-			<div class="py-2">
-				
-			</div>
 			<div class="fs-6 fw-light py-2" >
+				{% for u in underlyings %}
+				<div><a href="{% url 'open_interest' u %}">{{ u }}</a></div>
+				{% endfor %}
 				<form url="{% url 'open_interest' underlying %}" method="post">
                     {% csrf_token %}
-                    <input type="submit">
+                    <input class="btn btn-primary" value="update" type="submit">
                 </form>
 			</div>
 		</div>
 	</div>
 	
-  	<div class="row bg-light py-1">
-		<div class="col col-md-8">
-			<div class="col py-2">
-			</div>
-		</div>
-		<div class="col col-md-4">
-			<div class="col py-2">
-				&nbsp;
-			</div>
-		</div>
-	</div>
 </div>
 
 {% endblock %}
