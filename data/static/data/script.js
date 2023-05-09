@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * Note: make sure the data is sorted correctly, else it will not show and give a value is null error!
  */
 
+
 function show_history(security_id, parameter){
 
     fetch("/data/security_history/" + security_id, {
