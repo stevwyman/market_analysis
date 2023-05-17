@@ -33,3 +33,16 @@ docker network inspect analysis_net
 
 docker network prune
 ```
+## Virtual Env
+
+python3 -m venv ~/virtualenv/market-analysis/
+. ~/virtualenv/market-analysis/bin/activate
+
+
+## MySQL
+
+brew --prefix -> /opt/homebrew
+
+export LDFLAGS="-L/opt/homebrew/lib -L/opt/homebrew/opt/openssl/lib -L/opt/homebrew/Cellar"
+
+export CPPFLAGS="-I/opt/homebrew/include -I/opt/homebrew/opt/openssl/include"

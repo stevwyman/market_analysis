@@ -9,6 +9,12 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
+# Set the polygon.io API
+ENV POLYGON_API_KEY=###
+
+# Set the mongodb host
+ENV MONGODB_HOST=localhost
+
 COPY . /usr/src/app
 WORKDIR /usr/src/app
 

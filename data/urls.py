@@ -19,5 +19,12 @@ urlpatterns = [
     
     path("update_all", views.update_all, name="update_all"),
     path("open_interest/<str:underlying>", views.open_interest, name="open_interest"),
-    path("max_pain/<str:underlying>", views.max_pain, name="max_pain")
+    path("max_pain/<str:underlying>", views.max_pain, name="max_pain"),
+
+    # build_data_set
+    path("bds", views.build_data_set, name="build_data_set"),
+
+    # admin 
+    # create_default_lists
+    path("cdl", views.create_default_lists, name="create_default_list"),
 ]

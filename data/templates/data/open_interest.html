@@ -25,10 +25,22 @@
 				{% for u in underlyings %}
 				<div><a href="{% url 'open_interest' u %}">{{ u }}</a></div>
 				{% endfor %}
+			</div>
+		</div>
+	</div>
+
+	<div class="row bg-light py-1">
+		<div class="col col-md-8">
+			<div class="col py-2">
 				<form url="{% url 'open_interest' underlying %}" method="post">
                     {% csrf_token %}
-                    <input class="btn btn-primary" value="update" type="submit">
+                    <input class="btn btn-sm btn-outline-primary" value="update" type="submit">
                 </form>
+			</div>
+		</div>
+		<div class="col col-md-4">
+			<div class="col py-2">
+				&nbsp;
 			</div>
 		</div>
 	</div>

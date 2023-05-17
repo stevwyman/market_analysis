@@ -94,15 +94,15 @@ class SMA(MovingAverage):
             data = {}
             r_history = list()
             for entry in reversed(history):
-                self.add(float(entry.close))
-                r_history.append(float(entry.close))
-                # print(f"{entry.date} {entry.close}")
+                close = float(entry.close)
+                self.add(close)
+                r_history.append(close)
             data["sma"] = self.__sma
             data["sd"] = self.sigma_delta()
             data["length"] = self._length
+            data["delta"] = 100 * (r_history[-1] - self.__sma) / self.__sma
             hurst = Hurst()
             data["hurst"] = hurst.hurst(r_history)
-
             return data
         else:
             raise ValueError("History size not sufficient.")
@@ -143,11 +143,13 @@ class MACD:
         current_slow_ma = self.__slow_ma.add(value)
 
         if current_slow_ma is not None:
-            macd_line = current_fast_ma - current_slow_ma
+            macd_line = 100 * (current_fast_ma - current_slow_ma) /value
             signal_line = self.__macd_ma.add(macd_line)
 
             if signal_line is not None:
-                histogram = macd_line - signal_line
+                # normalize also the signal line
+                signal_line = 100 * signal_line / value
+                histogram = 100 * (macd_line - signal_line) / value
                 return (macd_line, signal_line, histogram)
 
         else:
@@ -182,6 +184,30 @@ class RSI:
             else:
                 return None
 
+
+class Momentum:
+    """
+    typical length is 14 or 30
+    """
+    def __init__(self, length=14):
+        # ma length
+        self._length = length
+        self._queue: deque = deque(maxlen=length)
+
+    def add(self, value: float) -> float:
+        """
+        returns the current ema for the given value if a valid ema does exist, else None
+        """
+
+        self._queue.appendleft(value)
+
+        # once we have enough data, we can start calculating the momentum
+        if len(self._queue) == self._length:
+            # taking the difference of the first element and the last
+            return self._queue[-1] - self._queue[0]
+        else:
+            return None
+        
 
 class Hurst:
     def hurst(self, input_ts, lags_to_test=[2, 20]):

@@ -35,6 +35,7 @@ CSRF_TRUSTED_ORIGINS = ["https://stevwyman.com"]
 INSTALLED_APPS = [
     "data",
     "django_bootstrap5",
+    "django_cron",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -83,6 +84,12 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        #"ENGINE": "django.db.backends.mysql",
+        #"user": "familytree",
+        #"password": "familytree",
+        #"host": "localhost",
+        #"database": "familytree",
+        #"raise_on_warnings": True
     }
 }
 
@@ -129,3 +136,9 @@ STATIC_URL = "data/static/"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Cron
+CRON_CLASSES = [
+    "data.cron.UpdateDailyJob",
+    # ...
+]

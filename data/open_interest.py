@@ -1,6 +1,6 @@
 import urllib3
 import pymongo
-import configparser
+from os import environ
 from bs4 import BeautifulSoup
 from lxml import etree
 from datetime import date, datetime, timedelta
@@ -8,7 +8,6 @@ import time
 import calendar
 
 DATE_FORMAT = "%Y%m%d"
-
 
 class OnlineReader:
     def __init__(self):
@@ -74,16 +73,22 @@ class OnlineReader:
 
 class LocaleDAO:
     def __init__(self):
-        config = configparser.ConfigParser()
-        config.read("config.ini")
-        self._client = pymongo.MongoClient(config.get("DB", "url"))
+        __db_host__ = "localhost"
+        if environ.get("MONGODB_HOST") is not None:
+            __db_host__ = environ.get("MONGODB_HOST")
+            print(f"using {__db_host__} to connect to to mongodb")
+        db_url = f"mongodb://{__db_host__}:27017/"
+
+        self._client = pymongo.MongoClient(db_url)
         try:
             self._client.server_info()
         except pymongo.errors.ServerSelectionTimeoutError:
             exit("Mongo instance not reachable.")
 
-        self._db = self._client[config.get("DB.OI", "db")]
-        self._collection = self._db[config.get("DB.OI", "collection")]
+        self._db = self._client["market_analysis"]
+
+        self._db = self._client["python_test"]
+        self._collection = self._db["open_interest"]
 
     def write(self, open_interest_data: dict) -> None:
         try:

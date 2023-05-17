@@ -5,13 +5,13 @@ from io import StringIO
 import decimal
 
 import pymongo
-import configparser
 
 from django.conf import settings
 
 from enum import Enum
 from time import time
 from datetime import date, datetime, timedelta
+from os import environ
 
 from data.models import Daily, Security
 
@@ -33,17 +33,20 @@ class Online_DAO_Factory:
 
 class YahooDAO:
     def __init__(self) -> None:
-        config = configparser.ConfigParser()
-        config.read("config.ini")
-        self._client = pymongo.MongoClient(config.get("DB", "url"))
+        
+        __db_host__ = "localhost"
+        if environ.get("MONGODB_HOST") is not None:
+            __db_host__ = environ.get("MONGODB_HOST")
+            print(f"using {__db_host__} to connect to to mongodb")
+        db_url = f"mongodb://{__db_host__}:27017/"
+
+        self._client = pymongo.MongoClient(db_url)
         try:
             self._client.server_info()
         except pymongo.errors.ServerSelectionTimeoutError:
             exit("Mongo instance not reachable.")
 
-        self._db = self._client[config.get("DB", "db")]
-        self._collection_price = self._db[config.get("DB.YAHOO.PRICE", "collection")]
-        self._collection_dks = self._db[config.get("DB.YAHOO.DKS", "collection")]
+        self._db = self._client["market_analysis"]
 
     def lookupSymbol(self, symbol) -> dict:
         """
@@ -105,10 +108,10 @@ class YahooDAO:
                     "shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price",
                     "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
         """
-
+        _price = self._db["yahoo_price"]
         try:
             # check if we have a price entry in the mongo-db
-            price = self._collection_price.find_one({"symbol": symbol})
+            price = _price.find_one({"symbol": symbol})
             if price is None:
                 print(f"no price object for {symbol}")
             else:
@@ -144,9 +147,9 @@ class YahooDAO:
         if r.status == 200:
             price = summary_profile["quoteSummary"]["result"][0]["price"]
 
-            upsertable_data = {"timestamp": datetime.now().timestamp(), "price": price}
-            self._collection_price.update_one(
-                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            _data = {"timestamp": datetime.now().timestamp(), "price": price}
+            _price.update_one(
+                {"symbol": symbol}, {"$set": _data}, upsert=True
             )
             return price
         else:
@@ -224,9 +227,11 @@ class YahooDAO:
             return {"error": "Not an equity."}
         else:
             symbol = security.symbol
+        
+        _defaultKeyStatistics = self._db["defaultKeyStatistics"]
         try:
             # check if we have a price entry in the mongo-db
-            defaultKeyStatistics = self._collection_dks.find_one({"symbol": symbol})
+            defaultKeyStatistics = _defaultKeyStatistics.find_one({"symbol": symbol})
             if defaultKeyStatistics is None:
                 print(f"no price object for {symbol}")
             else:
@@ -263,12 +268,12 @@ class YahooDAO:
                 "defaultKeyStatistics"
             ]
 
-            upsertable_data = {
+            _data = {
                 "timestamp": datetime.now().timestamp(),
                 "defaultKeyStatistics": defaultKeyStatistics,
             }
-            self._collection_dks.update_one(
-                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+            _defaultKeyStatistics.update_one(
+                {"symbol": symbol}, {"$set": _data}, upsert=True
             )
             return defaultKeyStatistics
         else:
@@ -322,12 +327,12 @@ class YahooDAO:
         if r.status == 200:
             assetProfile = summary_profile["quoteSummary"]["result"][0]["assetProfile"]
 
-            upsertable_data = {
+            _data = {
                 "timestamp": datetime.now().timestamp(),
                 "assetProfile": assetProfile,
             }
             _collection_assetProfile.update_one(
-                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+                {"symbol": symbol}, {"$set": _data}, upsert=True
             )
             return assetProfile
         else:
@@ -383,12 +388,12 @@ class YahooDAO:
                 "financialData"
             ]
 
-            upsertable_data = {
+            _data = {
                 "timestamp": datetime.now().timestamp(),
                 "financialData": financialData,
             }
             _collection_financialData.update_one(
-                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+                {"symbol": symbol}, {"$set": _data}, upsert=True
             )
             return financialData
         else:
@@ -445,12 +450,12 @@ class YahooDAO:
                 "summaryDetail"
             ]
 
-            upsertable_data = {
+            _data = {
                 "timestamp": datetime.now().timestamp(),
                 "summaryDetail": summaryDetail,
             }
             _collection_summaryDetail.update_one(
-                {"symbol": symbol}, {"$set": upsertable_data}, upsert=True
+                {"symbol": symbol}, {"$set": _data}, upsert=True
             )
             return summaryDetail
         else:

@@ -22,8 +22,10 @@ from data.open_interest import (
     generate_most_distribution,
 )
 from .models import (
+    User,
     Watchlist,
     Security,
+    DataProvider,
     Daily,
     DailyUpdate,
     Weekly,
@@ -128,6 +130,8 @@ def watchlist(request, watchlist_id: int):
         watchlist_entries.sort(key=lambda x: x["sma"]["sd"], reverse=_b_direction)
     elif order_by == "pef":
         watchlist_entries.sort(key=lambda x: x["pe_forward"], reverse=_b_direction)
+    elif order_by == "delta":
+        watchlist_entries.sort(key=lambda x: x["sma"]["delta"], reverse=_b_direction)
 
     # pagination
     paginator = Paginator(watchlist_entries, 6)
@@ -158,8 +162,12 @@ def security(request, security_id):
     """
     return a simple security entry with price
     """
-    sec = Security.objects.get(pk=security_id)
-
+    try:
+        sec = Security.objects.get(pk=security_id)
+    except:
+        messages.warning(request, f"Security with id {security_id} could not be found.")
+        return HttpResponseRedirect(reverse("index"))
+        
     # looking up additional information
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
     price = online_dao.lookupPrice(sec.symbol)
@@ -224,7 +232,10 @@ def security_new(request, watchlist_id):
                 sec.industry = summaryProfile["industry"]
                 sec.sector = summaryProfile["sector"]
             except:
-                messages.warning(request, summaryProfile["error"])
+                if "error" in summaryProfile.keys():
+                    messages.warning(request, summaryProfile["error"])
+                else:
+                    messages.warning(request, "no valid data for 'country, 'industry', or 'sector' ")
 
             sec.save()
             watchlist.securities.add(sec)
@@ -516,8 +527,10 @@ def tech_analysis(request, security_id) -> JsonResponse:
         macd_value = macd.add(close)
         rsi_value = rsi.add(close)
 
-    data["EMA(50)"] = ema50_value
-    data["EMA(20)"] = ema20_value
+    data[f"EMA(50)[{sec.currency_symbol}]"] = ema50_value
+    data["δEMA(50)[%]"] = 100 * (close - ema50_value) / ema50_value
+    data[f"EMA(20)[{sec.currency_symbol}]"] = ema20_value
+    data["δEMA(20)[%]"] = 100 * (close - ema20_value) / ema20_value
     data["MACD <sub>Histogram</sub>"] = macd_value[2]
     data["RSI"] = rsi_value
     data["MA(50) spread"] = sma50.sigma_delta()
@@ -724,106 +737,102 @@ def update_all(request):
 
     return JsonResponse(data, status=200)
 
-
+import pandas as pd
 def build_data_set(request) -> JsonResponse:
     """
     building a data structure that can be used as input for an AI algorithm
     """
-    data = {}
+    data = list()
 
     all_securities = Security.objects.all()
-    counter = 0
-    for index, item in enumerate(all_securities):  # default is zero
-        print(index, item)
+
     for security in all_securities:
-        print(f"processing {security}")
-        history = security.daily_data.all().order_by("-date")
 
-        prices_data = list()
-        ema50_data = list()
-        ema50 = EMA(50)
+        if security.type != "EQUITY":
+            print(f"skipping {security} as not an equity")
+            continue
+        else:
+            print(f"processing {security}")
 
-        ema20_data = list()
+        history = list(security.daily_data.order_by("date").all())
+
+        sma50 = SMA(50)
         ema20 = EMA(20)
-
-        bb = BollingerBands()
-        bb_lower = list()
-        bb_upper = list()
-
         macd = MACD()
-        macd_history_data = list()
-
-        volume_data = list()
 
         previous_close = 0
-        for entry in reversed(history):
-            # building the prices data using time and ohlc
-            candle = {}
-            candle["time"] = str(entry.date)
-            candle["open"] = float(entry.open_price)
-            candle["high"] = float(entry.high_price)
-            candle["low"] = float(entry.low)
-            candle["close"] = float(entry.close)
-            prices_data.append(candle)
 
-            ema50_value = ema50.add(float(entry.close))
-            if ema50_value is not None:
-                ema50_entry = {}
-                ema50_entry["time"] = str(entry.date)
-                ema50_entry["value"] = ema50_value
-                ema50_data.append(ema50_entry)
+        history_size = len(history)
+        index = 0
+        for entry in history:
 
-            ema20_value = ema20.add(float(entry.close))
-            if ema20_value is not None:
-                ema20_entry = {}
-                ema20_entry["time"] = str(entry.date)
-                ema20_entry["value"] = ema20_value
-                ema20_data.append(ema20_entry)
+            if (index + 5) > history_size:
+                print("continue")
+                continue
 
-            volume_value = float(entry.volume)
-            if volume_value > 0:
-                volume = {}
-                volume["time"] = str(entry.date)
-                volume["value"] = volume_value
-                if candle["close"] >= previous_close:
-                    volume["color"] = RGB_GREEN
-                else:
-                    volume["color"] = RGB_RED
-                volume_data.append(volume)
+            row = {}
 
-            bollinger = bb.add(float(entry.close))
-            if bollinger is not None:
-                bb_lower_entry = {}
-                bb_lower_entry["time"] = str(entry.date)
-                bb_lower_entry["value"] = bollinger[0]
+            __close = float(entry.close)
+            
+            if (previous_close != 0):
+                row["time"] = str(entry.date)
+                row["close"] = __close
 
-                bb_upper_entry = {}
-                bb_upper_entry["time"] = str(entry.date)
-                bb_upper_entry["value"] = bollinger[1]
+                next_close = float(history[index+1].close)
 
-                bb_lower.append(bb_lower_entry)
-                bb_upper.append(bb_upper_entry)
+                # we need to ensure that extreme values are capped, so they do not corrupt our min/max  afterwards
+                # -> so we cap all at 10%
 
-            macd_value = macd.add(float(entry.close))
+                __change_back_percent = 100 * (__close - previous_close) / previous_close
+                if __change_back_percent > 10:
+                    __change_back_percent = 10
+                __change_forward_percent = 100 * (next_close - __close) / __close
+                if __change_forward_percent > 10:
+                    __change_forward_percent = 10
+
+                row["change_back"] = __change_back_percent
+                row["change_forward"] = __change_forward_percent
+            
+                previous_close = __close
+                index += 1
+            else:
+                previous_close = __close
+                index += 1
+                continue
+            
+            macd_value = macd.add(__close)
             if macd_value is not None:
-                macd_histo_entry = {}
-                macd_histo_entry["time"] = str(entry.date)
-                macd_histo_entry["value"] = macd_value[2]
+                row["macd_histogram"] = macd_value[2]
+            else:
+                continue
 
-                macd_history_data.append(macd_histo_entry)
+            ema20_value = ema20.add(__close)
+            if ema20_value is not None:
+                row["ema20"] = ema20_value
+                row["ema20_delta"] = (__close - ema20_value) / ema20_value
+            else:
+                continue
 
-            previous_close = candle["close"]
+            sma50_value = sma50.add(__close)
+            sma50_sd = sma50.sigma_delta()
+            sma50_hurst = sma50.hurst()
+            if sma50_value is not None and sma50_sd is not None and sma50_hurst is not None:
+                row["sma50"] = sma50_value
+                row["sd50"] = sma50_sd
+                row["hurst"] = sma50_hurst
+                row["sma50_delta"] = (__close - sma50_value) / sma50_value
+            else:
+                continue
+                
+            data.append(row)
+    
+    df = pd.DataFrame(data)
+    compression_opts = dict(method='zip', archive_name='out.csv')  
+    df.to_csv('out.zip', index=False, compression=compression_opts) 
 
-        data["price"] = prices_data
-        data["ema50"] = ema50_data
-        data["ema20"] = ema20_data
-        data["volume"] = volume_data
-        data["macd"] = macd_history_data
-        data["bb_upper"] = bb_upper
-        data["bb_lower"] = bb_lower
-        counter += 1
-
-    return JsonResponse(data, status=200)
+    response_data = {}
+    response_data["list"] = data
+    return JsonResponse(response_data, status=200)
 
 
 #
@@ -926,3 +935,66 @@ def max_pain_distribution(request, underlying: str) -> JsonResponse:
     distribution = generate_most_distribution(parameter)
 
     return JsonResponse(distribution, status=200)
+
+
+#
+# init the default watchlists
+#
+from data.indices import DATA
+def create_default_lists(request):
+    """
+    simple action to initialize the database with a hand full of indices
+    """
+
+    try:
+        admin = User.objects.get(username="myAdmin")
+    except ObjectDoesNotExist:
+        admin = User(username="myAdmin", email="admin@admin.de", password="_admin-123")
+        admin.role = 1
+        admin.save()
+        print(f"User {admin} created")
+
+    try:
+        data_provider = DataProvider.objects.get(name="Yahoo")
+    except ObjectDoesNotExist:
+        data_provider = DataProvider(name="Yahoo", description="Provider for finance.yahoo.com")
+        data_provider.save()
+        print(f"Data provider {data_provider} created")
+
+    # looking up additional information
+    online_dao = Online_DAO_Factory().get_online_dao(data_provider)
+
+    for entry in DATA:
+        name = DATA[entry]["name"]
+        list = DATA[entry]["list"]
+
+        # create watchlist
+        watchlist = Watchlist(name=name, user=admin, visibility="AP")
+        watchlist.save()
+        print(f"created {watchlist}")
+
+        # add securities to watchlist
+        for symbol in list:
+            price = online_dao.lookupPrice(symbol)
+
+            # create new Security
+            sec = Security(symbol=symbol, data_provider=data_provider)
+            sec.name = price["shortName"]
+            sec.currency_symbol = price["currencySymbol"]
+            sec.currency = price["currency"]
+            sec.type = price["quoteType"]
+            sec.exchange = price["exchangeName"]
+
+            summaryProfile = online_dao.lookupSymbol(symbol)
+            try:
+                sec.country = summaryProfile["country"]
+                sec.industry = summaryProfile["industry"]
+                sec.sector = summaryProfile["sector"]
+            except:
+                pass
+
+            sec.save()
+            watchlist.securities.add(sec)
+            print(f"added {sec} to {watchlist}")
+
+    return JsonResponse({"all done", 201})
