@@ -4,7 +4,6 @@ from django.contrib.messages import get_messages
 from data.models import User, Watchlist, Security, DataProvider, Daily
 from data.OnlineDAO import YahooDAO, Interval
 
-
 # Create your tests here.
 class WatchlistViews(TestCase):
     def setUp(self) -> None:

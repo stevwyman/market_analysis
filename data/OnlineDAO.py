@@ -32,22 +32,33 @@ class Online_DAO_Factory:
 
 
 class YahooDAO:
-    def __init__(self) -> None:
-        
-        __db_host__ = "localhost"
-        if environ.get("MONGODB_HOST") is not None:
-            __db_host__ = environ.get("MONGODB_HOST")
-            print(f"using {__db_host__} to connect to to mongodb")
-        db_url = f"mongodb://{__db_host__}:27017/"
 
-        self._client = pymongo.MongoClient(db_url)
-        try:
-            self._client.server_info()
-        except pymongo.errors.ServerSelectionTimeoutError:
-            exit("Mongo instance not reachable.")
+    _instance = None
+    _mongo_client = None
+    _mongo_db = None
+    _http_client = urllib3.PoolManager()
 
-        self._db = self._client["market_analysis"]
+    def __new__(cls):
+        if cls._instance is None:
+            print('Creating the object')
+            cls._instance = super(YahooDAO, cls).__new__(cls)
+            # initialisation
+            __db_host__ = "localhost"
+            if environ.get("MONGODB_HOST") is not None:
+                __db_host__ = environ.get("MONGODB_HOST")
+                print(f"using {__db_host__} to connect to to mongodb")
+            db_url = f"mongodb://{__db_host__}:27017/"
 
+            cls._mongo_client = pymongo.MongoClient(db_url)
+            try:
+                cls._mongo_client.server_info()
+            except pymongo.errors.ServerSelectionTimeoutError:
+                exit("Mongo instance not reachable.")
+
+            cls._mongo_db = cls._mongo_client["market_analysis"]
+        return cls._instance
+
+    
     def lookupSymbol(self, symbol) -> dict:
         """
         returns, if found, the "summaryProfile" data set
@@ -60,7 +71,7 @@ class YahooDAO:
 
         """
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -108,7 +119,7 @@ class YahooDAO:
                     "shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price",
                     "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
         """
-        _price = self._db["yahoo_price"]
+        _price = self._mongo_db["yahoo_price"]
         try:
             # check if we have a price entry in the mongo-db
             price = _price.find_one({"symbol": symbol})
@@ -129,7 +140,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -167,7 +178,7 @@ class YahooDAO:
 
         # print(f"requesting from: {from_time} to: {to_time} with interval: {interval.value}")
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query1.finance.yahoo.com/v7/finance/download/" + security.symbol,
@@ -228,7 +239,7 @@ class YahooDAO:
         else:
             symbol = security.symbol
         
-        _defaultKeyStatistics = self._db["defaultKeyStatistics"]
+        _defaultKeyStatistics = self._mongo_db["defaultKeyStatistics"]
         try:
             # check if we have a price entry in the mongo-db
             defaultKeyStatistics = _defaultKeyStatistics.find_one({"symbol": symbol})
@@ -248,7 +259,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -289,7 +300,7 @@ class YahooDAO:
             return {"error": "Not an equity."}
         else:
             symbol = security.symbol
-        _collection_assetProfile = self._db["assetProfile"]
+        _collection_assetProfile = self._mongo_db["assetProfile"]
         try:
             # check if we have a price entry in the mongo-db
             assetProfile = _collection_assetProfile.find_one({"symbol": symbol})
@@ -309,7 +320,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -348,7 +359,7 @@ class YahooDAO:
             return {"error": "Not an equity."}
         else:
             symbol = security.symbol
-        _collection_financialData = self._db["financialData"]
+        _collection_financialData = self._mongo_db["financialData"]
         try:
             # check if we have a price entry in the mongo-db
             financialData = _collection_financialData.find_one({"symbol": symbol})
@@ -368,7 +379,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -410,7 +421,7 @@ class YahooDAO:
         else:
             symbol = security.symbol
 
-        _collection_summaryDetail = self._db["summaryDetail"]
+        _collection_summaryDetail = self._mongo_db["summaryDetail"]
         try:
             # check if we have a price entry in the mongo-db
             summaryDetail = _collection_summaryDetail.find_one({"symbol": symbol})
@@ -430,7 +441,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = urllib3.PoolManager()
+        http = self._http_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,

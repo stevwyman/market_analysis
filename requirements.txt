@@ -1,6 +1,5 @@
 django
 django-bootstrap5
-django-cron
 urllib3
 numpy
 pandas

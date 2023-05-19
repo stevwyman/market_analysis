@@ -35,7 +35,6 @@ CSRF_TRUSTED_ORIGINS = ["https://stevwyman.com"]
 INSTALLED_APPS = [
     "data",
     "django_bootstrap5",
-    "django_cron",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -136,9 +135,3 @@ STATIC_URL = "data/static/"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# Cron
-CRON_CLASSES = [
-    "data.cron.UpdateDailyJob",
-    # ...
-]
