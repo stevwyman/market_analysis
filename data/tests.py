@@ -2,7 +2,8 @@ from django.test import TestCase, Client
 from django.contrib.messages import get_messages
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
-from data.OnlineDAO import YahooDAO, Interval
+from data.history_dao import YahooDAO, Interval
+
 
 # Create your tests here.
 class WatchlistViews(TestCase):
@@ -89,8 +90,8 @@ class WatchlistViews(TestCase):
         dao = YahooDAO()
         self.assertIsNotNone(dao)
         daily_history = dao.lookupHistory(
-                apple, interval=Interval.DAILY, look_back=1000
-            )
+            apple, interval=Interval.DAILY, look_back=1000
+        )
         self.assertIsNotNone(daily_history)
         Daily.objects.bulk_create(daily_history)
 
@@ -99,8 +100,9 @@ class WatchlistViews(TestCase):
 
         client = Client(enforce_csrf_checks=True)
         response = client.post("/data/tp/" + str(apple.pk), data={"view": "sd"})
-        self.assertEqual(response.status_code, 403) ## TODO csrf test
+        self.assertEqual(response.status_code, 403)  ## TODO csrf test
         print(response)
+
 
 class YahooYCL(TestCase):
     dao = YahooDAO()

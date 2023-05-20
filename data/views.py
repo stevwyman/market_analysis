@@ -11,10 +11,14 @@ from django.urls import reverse
 from datetime import datetime, date
 from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI
 
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 import json
 import time
 
-from data.OnlineDAO import Online_DAO_Factory, Interval
+from data.history_dao import Online_DAO_Factory, Interval
 from data.open_interest import (
     get_max_pain_history,
     next_expiry_date,
@@ -119,7 +123,9 @@ def watchlist(request, watchlist_id: int):
         _b_direction = True
     else:
         _b_direction = False
-    print(f"sorting {direction} by {order_by}")
+
+    logger.debug("sorting %s by %s" % (direction, order_by))
+
     if order_by == "change":
         watchlist_entries.sort(
             key=lambda x: x["price"]["change_percent"], reverse=_b_direction
@@ -167,7 +173,7 @@ def security(request, security_id):
     except:
         messages.warning(request, f"Security with id {security_id} could not be found.")
         return HttpResponseRedirect(reverse("index"))
-        
+
     # looking up additional information
     online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
     price = online_dao.lookupPrice(sec.symbol)
@@ -235,7 +241,9 @@ def security_new(request, watchlist_id):
                 if "error" in summaryProfile.keys():
                     messages.warning(request, summaryProfile["error"])
                 else:
-                    messages.warning(request, "no valid data for 'country, 'industry', or 'sector' ")
+                    messages.warning(
+                        request, "no valid data for 'country, 'industry', or 'sector' "
+                    )
 
             sec.save()
             watchlist.securities.add(sec)
@@ -494,7 +502,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
 
             data["tp_data"] = hurst_data
 
-        print(data)
+        logger.debug(data)
 
         return JsonResponse(data, status=201)
 
@@ -737,7 +745,10 @@ def update_all(request):
 
     return JsonResponse(data, status=200)
 
+
 import pandas as pd
+
+
 def build_data_set(request) -> JsonResponse:
     """
     building a data structure that can be used as input for an AI algorithm
@@ -747,7 +758,6 @@ def build_data_set(request) -> JsonResponse:
     all_securities = Security.objects.all()
 
     for security in all_securities:
-
         if security.type != "EQUITY":
             print(f"skipping {security} as not an equity")
             continue
@@ -765,7 +775,6 @@ def build_data_set(request) -> JsonResponse:
         history_size = len(history)
         index = 0
         for entry in history:
-
             if (index + 5) > history_size:
                 print("continue")
                 continue
@@ -773,17 +782,19 @@ def build_data_set(request) -> JsonResponse:
             row = {}
 
             __close = float(entry.close)
-            
-            if (previous_close != 0):
+
+            if previous_close != 0:
                 row["time"] = str(entry.date)
                 row["close"] = __close
 
-                next_close = float(history[index+1].close)
+                next_close = float(history[index + 1].close)
 
                 # we need to ensure that extreme values are capped, so they do not corrupt our min/max  afterwards
                 # -> so we cap all at 10%
 
-                __change_back_percent = 100 * (__close - previous_close) / previous_close
+                __change_back_percent = (
+                    100 * (__close - previous_close) / previous_close
+                )
                 if __change_back_percent > 10:
                     __change_back_percent = 10
                 __change_forward_percent = 100 * (next_close - __close) / __close
@@ -792,14 +803,14 @@ def build_data_set(request) -> JsonResponse:
 
                 row["change_back"] = __change_back_percent
                 row["change_forward"] = __change_forward_percent
-            
+
                 previous_close = __close
                 index += 1
             else:
                 previous_close = __close
                 index += 1
                 continue
-            
+
             macd_value = macd.add(__close)
             if macd_value is not None:
                 row["macd_histogram"] = macd_value[2]
@@ -816,19 +827,23 @@ def build_data_set(request) -> JsonResponse:
             sma50_value = sma50.add(__close)
             sma50_sd = sma50.sigma_delta()
             sma50_hurst = sma50.hurst()
-            if sma50_value is not None and sma50_sd is not None and sma50_hurst is not None:
+            if (
+                sma50_value is not None
+                and sma50_sd is not None
+                and sma50_hurst is not None
+            ):
                 row["sma50"] = sma50_value
                 row["sd50"] = sma50_sd
                 row["hurst"] = sma50_hurst
                 row["sma50_delta"] = (__close - sma50_value) / sma50_value
             else:
                 continue
-                
+
             data.append(row)
-    
+
     df = pd.DataFrame(data)
-    compression_opts = dict(method='zip', archive_name='out.csv')  
-    df.to_csv('out.zip', index=False, compression=compression_opts) 
+    compression_opts = dict(method="zip", archive_name="out.csv")
+    df.to_csv("out.zip", index=False, compression=compression_opts)
 
     response_data = {}
     response_data["list"] = data
@@ -941,6 +956,8 @@ def max_pain_distribution(request, underlying: str) -> JsonResponse:
 # init the default watchlists
 #
 from data.indices import DATA
+
+
 def create_default_lists(request):
     """
     simple action to initialize the database with a hand full of indices
@@ -957,7 +974,9 @@ def create_default_lists(request):
     try:
         data_provider = DataProvider.objects.get(name="Yahoo")
     except ObjectDoesNotExist:
-        data_provider = DataProvider(name="Yahoo", description="Provider for finance.yahoo.com")
+        data_provider = DataProvider(
+            name="Yahoo", description="Provider for finance.yahoo.com"
+        )
         data_provider.save()
         print(f"Data provider {data_provider} created")
 

@@ -12,6 +12,9 @@ from enum import Enum
 from time import time
 from datetime import date, datetime, timedelta
 from os import environ
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 from data.models import Daily, Security
 
@@ -32,7 +35,6 @@ class Online_DAO_Factory:
 
 
 class YahooDAO:
-
     _instance = None
     _mongo_client = None
     _mongo_db = None
@@ -40,13 +42,13 @@ class YahooDAO:
 
     def __new__(cls):
         if cls._instance is None:
-            print('Creating the object')
+            logger.info("Creating YahooDAO")
             cls._instance = super(YahooDAO, cls).__new__(cls)
             # initialisation
             __db_host__ = "localhost"
             if environ.get("MONGODB_HOST") is not None:
                 __db_host__ = environ.get("MONGODB_HOST")
-                print(f"using {__db_host__} to connect to to mongodb")
+                logger.debug("using %s to connecto mongodb" % __db_host__)
             db_url = f"mongodb://{__db_host__}:27017/"
 
             cls._mongo_client = pymongo.MongoClient(db_url)
@@ -58,7 +60,6 @@ class YahooDAO:
             cls._mongo_db = cls._mongo_client["market_analysis"]
         return cls._instance
 
-    
     def lookupSymbol(self, symbol) -> dict:
         """
         returns, if found, the "summaryProfile" data set
@@ -86,7 +87,9 @@ class YahooDAO:
 
         summary_profile = json.loads(r.data.decode("utf-8"))
 
-        print(f"status for requesting 'summary detail' of {symbol}: {r.status}")
+        logger.debug(
+            "status for requesting 'summary profile' of %s: %s " % (symbol, r.status)
+        )
 
         if r.status == 200:
             return summary_profile["quoteSummary"]["result"][0]["summaryProfile"]
@@ -124,7 +127,7 @@ class YahooDAO:
             # check if we have a price entry in the mongo-db
             price = _price.find_one({"symbol": symbol})
             if price is None:
-                print(f"no price object for {symbol}")
+                logger.debug("no 'price' for %s" % symbol)
             else:
                 # check if the available entry is older than 5 minutes
                 entry_ts = price["timestamp"]
@@ -133,6 +136,7 @@ class YahooDAO:
                 # if entry_ts + 300 > current_ts:   # for production 5 minutes
                 if entry_ts + 3600 > current_ts:  # for testing 1 hour
                     # print(f"serving price for {symbol} from db")
+                    logger.debug("serving price for %s from db" % symbol)
                     return price["price"]
                 else:
                     print(f"need to refresh the price in the database")
@@ -152,16 +156,14 @@ class YahooDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-        print(f"status for requesting 'price' of {symbol}: {r.status}")
+        logger.debug("status for requesting 'price' of %s: %s " % (symbol, r.status))
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
             price = summary_profile["quoteSummary"]["result"][0]["price"]
 
             _data = {"timestamp": datetime.now().timestamp(), "price": price}
-            _price.update_one(
-                {"symbol": symbol}, {"$set": _data}, upsert=True
-            )
+            _price.update_one({"symbol": symbol}, {"$set": _data}, upsert=True)
             return price
         else:
             error = summary_profile["quoteSummary"]["error"]
@@ -190,7 +192,9 @@ class YahooDAO:
             },
         )
 
-        print(f"status for requesting 'history' of {security.symbol}: {r.status}")
+        logger.debug(
+            "status for requesting 'history' of %s: %s " % (security.symbol, r.status)
+        )
 
         data = r.data.decode("utf-8")
 
@@ -238,13 +242,13 @@ class YahooDAO:
             return {"error": "Not an equity."}
         else:
             symbol = security.symbol
-        
+
         _defaultKeyStatistics = self._mongo_db["defaultKeyStatistics"]
         try:
             # check if we have a price entry in the mongo-db
             defaultKeyStatistics = _defaultKeyStatistics.find_one({"symbol": symbol})
             if defaultKeyStatistics is None:
-                print(f"no price object for {symbol}")
+                logger.debug("no 'default key statistics' for %s" % symbol)
             else:
                 # check if the available entry is older than 5 minutes
                 entry_ts = defaultKeyStatistics["timestamp"]
@@ -271,7 +275,10 @@ class YahooDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-        print(f"status for requesting 'defaultKeyStatistics' of {symbol}: {r.status}")
+        logger.debug(
+            "status for requesting 'default key statistics' of %s: %s "
+            % (symbol, r.status)
+        )
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
@@ -332,7 +339,9 @@ class YahooDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-        print(f"status for requesting 'assetProfile' of {symbol}: {r.status}")
+        logger.debug(
+            "status for requesting 'asset profile' of %s: %s " % (symbol, r.status)
+        )
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
@@ -391,7 +400,9 @@ class YahooDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-        print(f"status for requesting 'financialData' of {symbol}: {r.status}")
+        logger.debug(
+            "status for requesting 'finacial data' of %s: %s " % (symbol, r.status)
+        )
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
@@ -426,20 +437,20 @@ class YahooDAO:
             # check if we have a price entry in the mongo-db
             summaryDetail = _collection_summaryDetail.find_one({"symbol": symbol})
             if summaryDetail is None:
-                print(f"no 'summaryDetail' object for {symbol}")
+                logger.debug("no 'summary detail' for %s" % symbol)
             else:
                 # check if the available entry is older than 5 minutes
                 entry_ts = summaryDetail["timestamp"]
                 current_ts = datetime.now().timestamp()
 
                 if entry_ts + 86400 > current_ts:  # for testing 1 day
-                    print(f"serving 'summaryDetail' for {symbol} from db")
+                    logger.debug("serving 'summary detail' for %s from db " % symbol)
                     return summaryDetail["summaryDetail"]
                 else:
-                    print(f"need to refresh the 'summaryDetail' in the database")
+                    logger.debug("need to refresh 'summary detail' for %s" % symbol)
 
         except pymongo.errors.ServerSelectionTimeoutError as e:
-            print("Could not write data to locale storage: ", e)
+            logger.error("Could not write data to local storage: %s" % e)
 
         http = self._http_client
         r = http.request(
@@ -453,7 +464,10 @@ class YahooDAO:
                 "corsDomain": "finance.yahoo.com",
             },
         )
-        print(f"status for requesting 'summaryDetail' of {symbol}: {r.status}")
+        logger.debug(
+            "status for requesting 'summary detail' of %s: %s " % (symbol, r.status)
+        )
+
         summary_profile = json.loads(r.data.decode("utf-8"))
 
         if r.status == 200:
