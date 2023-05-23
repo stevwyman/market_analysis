@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.contrib.messages import get_messages
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
-from data.history_dao import YahooDAO, Interval
+from data.history_dao import History_DAO_Factory, Interval
 
 
 # Create your tests here.
@@ -87,9 +87,9 @@ class WatchlistViews(TestCase):
             symbol="AAPL", name="Apple Inc.", data_provider=yahoo
         )
 
-        dao = YahooDAO()
-        self.assertIsNotNone(dao)
-        daily_history = dao.lookupHistory(
+        history_dao = History_DAO_Factory().get_online_dao(yahoo)
+        self.assertIsNotNone(history_dao)
+        daily_history = history_dao.lookupHistory(
             apple, interval=Interval.DAILY, look_back=1000
         )
         self.assertIsNotNone(daily_history)
@@ -105,8 +105,6 @@ class WatchlistViews(TestCase):
 
 
 class YahooYCL(TestCase):
-    dao = YahooDAO()
-
     def setUp(self) -> None:
         yahoo = DataProvider.objects.create(name="Yahoo")
         manager = User.objects.create(role=User.MANAGER)
@@ -148,10 +146,12 @@ class YahooYCL(TestCase):
                 print(security.watchlists.all())
 
     def test_historic_import(self):
+        data_provider = DataProvider.objects.get(name="Yahoo")
+        history_dao = History_DAO_Factory().get_online_dao(data_provider)
         watchlist = Watchlist.objects.get(name="Test List")
 
         for security in watchlist.securities.all():
-            result = self.dao.lookupHistory(
+            result = history_dao.lookupHistory(
                 security, interval=Interval.DAILY, look_back=10
             )
             Daily.objects.bulk_create(result)
@@ -161,15 +161,48 @@ class YahooYCL(TestCase):
             print(f"{security.symbol} daily has {daily.count()} entries")
 
     def test_read_quote_summary(self):
-        result = self.dao.lookupSymbol("AAPL")
+        data_provider = DataProvider.objects.get(name="Yahoo")
+        history_dao = History_DAO_Factory().get_online_dao(data_provider)
+
+        result = history_dao.lookupSymbol("AAPL")
         self.assertEqual(result["country"], "United States")
 
-        result = self.dao.lookupSymbol("AAPP")
+        result = history_dao.lookupSymbol("AAPP")
         self.assertEqual(result["error"], "Quote not found for ticker symbol: AAPP")
 
     def test_read_price(self):
-        result = self.dao.lookupPrice("AAPL")
+        data_provider = DataProvider.objects.get(name="Yahoo")
+        history_dao = History_DAO_Factory().get_online_dao(data_provider)
+
+        result = history_dao.lookupPrice("AAPL")
         self.assertEqual(result["shortName"], "Apple Inc.")
 
-        result = self.dao.lookupPrice("AAPP")
+        result = history_dao.lookupPrice("AAPP")
         self.assertEqual(result["error"], "Quote not found for ticker symbol: AAPP")
+
+
+from data.views import underlyings
+from data.open_interest import next_expiry_date, get_max_pain_history, update_data
+
+
+class OI(TestCase):
+    def test_read_oi_dax(self) -> None:
+        product = underlyings["DAX"]
+        self.assertIsNotNone(product)
+        expiry_date = next_expiry_date()
+        self.assertIsNotNone(expiry_date)
+        parameter = {"product": product, "expiry_date": expiry_date}
+
+        max_pain_over_time = sorted(
+            get_max_pain_history(parameter), key=lambda x: x[0], reverse=False
+        )
+
+        if len(max_pain_over_time) > 0:
+            pass
+        else:
+            update_data(parameter)
+            max_pain_over_time = sorted(
+                get_max_pain_history(parameter), key=lambda x: x[0], reverse=False
+            )
+
+        self.assertGreater(len(max_pain_over_time), 0)

@@ -60,7 +60,8 @@
 			</div>
 			<div class="fs-6 fw-light py-2" >
 				{% if security.type == "EQUITY" %}
-				<p>{{ security.sector}} | {{ security.industry }}</p>
+				<p>Sector: {{ security.sector}} <br> 
+					Industry: {{ security.industry }}</p>
 				{% endif %}
 				<div id="a_data">
 					{% if security.type == "EQUITY" %}

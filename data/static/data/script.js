@@ -101,7 +101,14 @@ function show_ta(security_id){
 					_tr.append(_td_l)
 
 					_td_r = document.createElement("td")
+					if (data[key] >= 0){
+						_td_r.classList.add("text-success")
+					} else {
+						_td_r.classList.add("text-danger")
+					}
+
 					_td_r.innerHTML = data[key].toFixed(2)
+
 					_tr.append(_td_r)
 					tbody.append(_tr)
 				}

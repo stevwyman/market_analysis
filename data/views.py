@@ -18,7 +18,7 @@ logger = getLogger(__name__)
 import json
 import time
 
-from data.history_dao import Online_DAO_Factory, Interval
+from data.history_dao import History_DAO_Factory, Interval
 from data.open_interest import (
     get_max_pain_history,
     next_expiry_date,
@@ -98,7 +98,7 @@ def watchlist(request, watchlist_id: int):
     for security in securities:
         watchlist_entry = {}
         watchlist_entry["security"] = security
-        dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+        dao = History_DAO_Factory().get_online_dao(security.data_provider)
         watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
 
         try:
@@ -175,7 +175,7 @@ def security(request, security_id):
         return HttpResponseRedirect(reverse("index"))
 
     # looking up additional information
-    online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+    online_dao = History_DAO_Factory().get_online_dao(sec.data_provider)
     price = online_dao.lookupPrice(sec.symbol)
 
     # for testing
@@ -212,7 +212,7 @@ def security_new(request, watchlist_id):
             dataProvider = form.cleaned_data["data_provider"]
 
             # looking up additional information
-            online_dao = Online_DAO_Factory().get_online_dao(dataProvider)
+            online_dao = History_DAO_Factory().get_online_dao(dataProvider)
 
             price = online_dao.lookupPrice(symbol)
             # print(price)
@@ -251,7 +251,7 @@ def security_new(request, watchlist_id):
             #
             # add initial history for this entry
             #
-            online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+            online_dao = History_DAO_Factory().get_online_dao(sec.data_provider)
 
             # request new history from online dao
             result = online_dao.lookupHistory(security=sec, look_back=2000)
@@ -351,7 +351,7 @@ def security_search(request) -> JsonResponse:
                 for security in securities:
                     watchlist_entry = {}
                     watchlist_entry["security"] = security
-                    dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+                    dao = History_DAO_Factory().get_online_dao(security.data_provider)
                     watchlist_entry["price"] = humanize_price(
                         dao.lookupPrice(security.symbol)
                     )
@@ -405,7 +405,7 @@ def history_update(request, security_id):
                 reverse("security", kwargs={"security_id": sec.id})
             )
 
-    online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+    online_dao = History_DAO_Factory().get_online_dao(sec.data_provider)
 
     # request new history from online dao
     result = online_dao.lookupHistory(security=sec, interval=_interval, look_back=5000)
@@ -525,6 +525,7 @@ def tech_analysis(request, security_id) -> JsonResponse:
 
     macd = MACD()
     rsi = RSI()
+    bb = BollingerBands()
 
     daily = sec.daily_data.all()[:1000]
     for entry in reversed(daily):
@@ -534,16 +535,29 @@ def tech_analysis(request, security_id) -> JsonResponse:
         ema20_value = ema20.add(close)
         macd_value = macd.add(close)
         rsi_value = rsi.add(close)
+        bb_value = bb.add(close)
 
-    data[f"EMA(50)[{sec.currency_symbol}]"] = ema50_value
+    #data[f"EMA(50)[{sec.currency_symbol}]"] = ema50_value
     data["δEMA(50)[%]"] = 100 * (close - ema50_value) / ema50_value
-    data[f"EMA(20)[{sec.currency_symbol}]"] = ema20_value
+    #data[f"EMA(20)[{sec.currency_symbol}]"] = ema20_value
     data["δEMA(20)[%]"] = 100 * (close - ema20_value) / ema20_value
     data["MACD <sub>Histogram</sub>"] = macd_value[2]
     data["RSI"] = rsi_value
     data["MA(50) spread"] = sma50.sigma_delta()
-    data["Hurst value"] = sma50.hurst()
 
+    bb_center = (bb_value[0] + bb_value[1])/2
+    bb_position_rel = close - bb_center
+    if bb_position_rel >= 0: # we are in the upper band
+        data["BBands"] = 100 * bb_position_rel / (bb_value[1] - bb_center) 
+    else:
+        data["BBands"] = -100 * bb_position_rel / (bb_value[0] - bb_center) 
+
+    hurst_value = sma50.hurst()
+    if hurst_value > 0.5:
+        data["Hurst<sub>trending</sub>"] = hurst_value
+    else:
+        data["Hurst<sub>mean rev.</sub>"] = hurst_value
+    
     return JsonResponse(data, status=201)
 
 
@@ -556,7 +570,7 @@ def fundamental_analysis(request, security_id) -> JsonResponse:
         return JsonResponse({"error", "security has not been found"}, status=404)
 
     if sec.type == "EQUITY":
-        online_dao = Online_DAO_Factory().get_online_dao(sec.data_provider)
+        online_dao = History_DAO_Factory().get_online_dao(sec.data_provider)
         data = humanize_fundamentals(
             online_dao.lookup_financial_data(sec),
             online_dao.lookup_default_key_statistics(sec),
@@ -682,7 +696,7 @@ def security_history(request, security_id) -> JsonResponse:
         dataProvider = security.data_provider
 
         # looking up additional information
-        online_dao = Online_DAO_Factory().get_online_dao(dataProvider)
+        online_dao = History_DAO_Factory().get_online_dao(dataProvider)
 
         price = online_dao.lookupPrice(symbol)
         time_ts = datetime.utcfromtimestamp(price["regularMarketTime"]).strftime(
@@ -719,7 +733,7 @@ def update_all(request):
                 print(f"no update required for {security}")
                 continue
 
-        online_dao = Online_DAO_Factory().get_online_dao(security.data_provider)
+        online_dao = History_DAO_Factory().get_online_dao(security.data_provider)
 
         # request new history from online dao
         result = online_dao.lookupHistory(security=security, look_back=5000)
@@ -756,38 +770,53 @@ def build_data_set(request) -> JsonResponse:
     data = list()
 
     all_securities = Security.objects.all()
+    # all_securities = Security.objects.filter(symbol="ADS.DE")
 
     for security in all_securities:
         if security.type != "EQUITY":
-            print(f"skipping {security} as not an equity")
+            logger.debug(f"skipping {security} as not an equity")
             continue
         else:
-            print(f"processing {security}")
+            logger.info(f"processing {security}")
 
         history = list(security.daily_data.order_by("date").all())
+        logger.debug(f"... history size: {len(history)}")
 
-        sma50 = SMA(50)
-        ema20 = EMA(20)
-        macd = MACD()
+        # define the list of features
+        sma50 = SMA(50)     # mid term sma: rel. slope, delta, hurst and sigma delta
+        ema20 = EMA(20)     # short term ema: rel. slope, delta
+        macd = MACD()       # not sure if we want to use the MACD, requires a lot of regularisation
+        rsi = RSI()         # using a simple momentum indicator
 
         previous_close = 0
+        previous_sma50 = 0
+        previous_ema20 = 0
+        previous_rsi = 0
 
         history_size = len(history)
         index = 0
+        FORWARD_LABEL_SIZE = 5
         for entry in history:
-            if (index + 5) > history_size:
-                print("continue")
+            # the last are irrelevant, as we do not have any label information for those
+            if (index + FORWARD_LABEL_SIZE + 1) > history_size:
+                logger.debug("continue")
                 continue
 
             row = {}
 
+            # the close as input for all the indicators
             __close = float(entry.close)
+            # logger.debug(f"processing {entry.date} with close at {__close}")
+            
 
             if previous_close != 0:
+                # keep those three as reference
                 row["time"] = str(entry.date)
                 row["close"] = __close
+                row["symbol"] = security.symbol
 
-                next_close = float(history[index + 1].close)
+                # this will be our label
+                next_close = float(history[index + FORWARD_LABEL_SIZE].close)
 
                 # we need to ensure that extreme values are capped, so they do not corrupt our min/max  afterwards
                 # -> so we cap all at 10%
@@ -797,13 +826,23 @@ def build_data_set(request) -> JsonResponse:
                 )
                 if __change_back_percent > 10:
                     __change_back_percent = 10
+            
+                # just for reference
+                row["change_back"] = __change_back_percent
+
+                # building the label, using the forward percent as category 
                 __change_forward_percent = 100 * (next_close - __close) / __close
+
                 if __change_forward_percent > 10:
                     __change_forward_percent = 10
+                elif __change_forward_percent < -10:
+                    __change_forward_percent = -10
 
-                row["change_back"] = __change_back_percent
-                row["change_forward"] = __change_forward_percent
+                if __change_forward_percent < 0:
+                    __change_forward_percent += 20
 
+                row["change_forward"] = round(__change_forward_percent, 0)
+                
                 previous_close = __close
                 index += 1
             else:
@@ -811,42 +850,65 @@ def build_data_set(request) -> JsonResponse:
                 index += 1
                 continue
 
+            # now we work on the features
+            # macd
             macd_value = macd.add(__close)
             if macd_value is not None:
                 row["macd_histogram"] = macd_value[2]
-            else:
-                continue
 
+
+            # ema20
             ema20_value = ema20.add(__close)
-            if ema20_value is not None:
-                row["ema20"] = ema20_value
-                row["ema20_delta"] = (__close - ema20_value) / ema20_value
-            else:
-                continue
+            if previous_ema20 != 0:
+                if ema20_value is not None and previous_ema20 is not None:
+                    # just as a reference
+                    row["ema20"] = ema20_value
+                    # we will use those as features
+                    row["ema20_delta"] = (__close - ema20_value) / ema20_value
+                    row["ema20_slope"] = (ema20_value - previous_ema20) / previous_ema20
 
+            previous_ema20 = ema20_value
+
+            # sma50
             sma50_value = sma50.add(__close)
-            sma50_sd = sma50.sigma_delta()
-            sma50_hurst = sma50.hurst()
-            if (
-                sma50_value is not None
-                and sma50_sd is not None
-                and sma50_hurst is not None
-            ):
-                row["sma50"] = sma50_value
-                row["sd50"] = sma50_sd
-                row["hurst"] = sma50_hurst
-                row["sma50_delta"] = (__close - sma50_value) / sma50_value
-            else:
-                continue
+            if previous_sma50 != 0:
+                if sma50_value is not None and previous_sma50 is not None:
+                    sma50_sd = sma50.sigma_delta()
+                    sma50_hurst = sma50.hurst()
+                    if (
+                        sma50_value is not None
+                        and sma50_sd is not None
+                        and sma50_hurst is not None
+                    ):
+                        # reference
+                        row["sma50"] = sma50_value
+                        # features
+                        row["sd50"] = sma50_sd
+                        row["hurst"] = sma50_hurst
+                        row["sma50_delta"] = (__close - sma50_value) / sma50_value
+                        row["sma50_slope"] = (sma50_value - previous_sma50) / previous_sma50
 
-            data.append(row)
+            previous_sma50 = sma50_value
+
+            # rsi
+            rsi_value = rsi.add(__close)
+            if previous_rsi != 0:
+                if rsi_value is not None and previous_rsi is not None:
+                    row["rsi"] = rsi_value
+                    row["rsi_slope"] = (rsi_value - previous_rsi) / previous_rsi
+            previous_rsi = rsi_value
+
+            # only append complete rows
+            if len(row) == 16:
+                logger.debug(f"... appending {row}")
+                data.append(row)
 
     df = pd.DataFrame(data)
     compression_opts = dict(method="zip", archive_name="out.csv")
     df.to_csv("out.zip", index=False, compression=compression_opts)
 
     response_data = {}
-    response_data["list"] = data
+    response_data["lines"] = len(data)
     return JsonResponse(response_data, status=200)
 
 
@@ -981,7 +1043,7 @@ def create_default_lists(request):
         print(f"Data provider {data_provider} created")
 
     # looking up additional information
-    online_dao = Online_DAO_Factory().get_online_dao(data_provider)
+    online_dao = History_DAO_Factory().get_online_dao(data_provider)
 
     for entry in DATA:
         name = DATA[entry]["name"]

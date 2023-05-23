@@ -17,6 +17,7 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 from data.models import Daily, Security
+from data.meta_dao import MetaData_Factory
 
 
 class Interval(Enum):
@@ -26,7 +27,7 @@ class Interval(Enum):
     MONTHLY = "1mo"
 
 
-class Online_DAO_Factory:
+class History_DAO_Factory:
     def get_online_dao(self, data_provider):
         if data_provider.name == "Yahoo":
             return YahooDAO()
@@ -36,7 +37,6 @@ class Online_DAO_Factory:
 
 class YahooDAO:
     _instance = None
-    _mongo_client = None
     _mongo_db = None
     _http_client = urllib3.PoolManager()
 
@@ -45,19 +45,7 @@ class YahooDAO:
             logger.info("Creating YahooDAO")
             cls._instance = super(YahooDAO, cls).__new__(cls)
             # initialisation
-            __db_host__ = "localhost"
-            if environ.get("MONGODB_HOST") is not None:
-                __db_host__ = environ.get("MONGODB_HOST")
-                logger.debug("using %s to connecto mongodb" % __db_host__)
-            db_url = f"mongodb://{__db_host__}:27017/"
-
-            cls._mongo_client = pymongo.MongoClient(db_url)
-            try:
-                cls._mongo_client.server_info()
-            except pymongo.errors.ServerSelectionTimeoutError:
-                exit("Mongo instance not reachable.")
-
-            cls._mongo_db = cls._mongo_client["market_analysis"]
+            cls._mongo_db = MetaData_Factory().db("market_analysis")
         return cls._instance
 
     def lookupSymbol(self, symbol) -> dict:
@@ -139,7 +127,7 @@ class YahooDAO:
                     logger.debug("serving price for %s from db" % symbol)
                     return price["price"]
                 else:
-                    print(f"need to refresh the price in the database")
+                    logger.debug("update of price required for %s" % symbol)
 
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
