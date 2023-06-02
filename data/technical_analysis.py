@@ -135,21 +135,21 @@ class MACD:
         self.__slow_ma = EMA(slow_period)
         self.__macd_ma = EMA(signal_period)
 
-    def add(self, value: float) -> Optional[Tuple[float, float, float]]:
+    def add(self, value: float) -> Optional[Tuple[float, float, float, float]]:
         """
         returning a tupel with macd line, signal line and histogram
+        Note: all values are normalized
         """
         current_fast_ma = self.__fast_ma.add(value)
         current_slow_ma = self.__slow_ma.add(value)
 
         if current_slow_ma is not None:
-            macd_line = 100 * (current_fast_ma - current_slow_ma) /value
+            macd_line = 100 * (current_fast_ma - current_slow_ma) / value
             signal_line = self.__macd_ma.add(macd_line)
 
             if signal_line is not None:
                 # normalize also the signal line
-                signal_line = 100 * signal_line / value
-                histogram = 100 * (macd_line - signal_line) / value
+                histogram = macd_line - signal_line
                 return (macd_line, signal_line, histogram)
 
         else:

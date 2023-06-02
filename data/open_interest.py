@@ -264,6 +264,7 @@ def get_max_pain_history(parameter: dict) -> list:
 
 
 def get_most_recent_distribution(parameter: dict) -> None:
+    
     max_pain_over_time = sorted(
         get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
     )
@@ -343,6 +344,8 @@ def get_most_recent_distribution(parameter: dict) -> None:
     for mp in max_pain:
         if mp < max_level and mp > min_level:
             max_pain_filtered[mp] = max_pain[mp]
+
+    return max_pain_filtered
 
 
 def generate_most_distribution(parameter: dict) -> dict:

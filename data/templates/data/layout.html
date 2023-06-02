@@ -31,6 +31,7 @@
                         <li class="nav-item">
                             <a class="nav-link active" aria-current="page" href="/data">Home</a>
                         </li>
+                        {% if user.is_authenticated %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 Watchlists
@@ -39,18 +40,57 @@
                                 {% for watchlist in watchlists %}
                                 <li><a class="dropdown-item" href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a></li>
                                 {% endfor %}
-                                <li><a class="dropdown-item" href="{% url 'watchlist_new' %}">+</a></li>
                             </ul>
                         </li>
+                        {% endif %}
+                        {% if user.is_authenticated and user.role < 3 %}
                         <li class="nav-item">
                             <a class="nav-link active" aria-current="page" href="{% url 'open_interest' 'DAX' %}">OI</a>
                         </li>
+                        {% endif %}
+                        {% if user.is_authenticated and user.role == 1 %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Admin
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'update_all' %}">update history</a></li>
+                                <li><a class="dropdown-item" href="{% url 'create_default_list' %}">duild default</a></li>
+                                <li><a class="dropdown-item" href="{% url 'create_sp500_list' %}">build S&P 500</a></li>
+                                <li><a class="dropdown-item" href="{% url 'build_data_set' %}">build dataset</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+                        {% if user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Signed in as {{ user.username }}</a>
+                            <ul class="dropdown-menu">
+                                {% if user.role < 3 %}
+                                <li class="nav-item">
+                                    <a class="dropdown-item" href="{% url 'watchlist_new' %}">New Watchlist</a>
+                                </li>
+                                {% endif %}
+                                <li class="nav-item">
+                                    <a class="dropdown-item" href="{% url 'logout' %}">Log Out</a>
+                                </li>
+                            </ul>
+                        </li>
+                        {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">Log In</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'register' %}">Register</a>
+                        </li>
+                        {% endif %}
                     </ul>
+                    {% if user.is_authenticated %}
                     <form autocomplete="off" class="d-flex" role="search" id="search_form" action="{% url 'security_search' %}" method="post">
                         {% csrf_token %}
                         <input class="form-control me-2" type="search" placeholder="Search" name="id" aria-label="Search" minlength="2">
                         <button class="btn btn-outline-light" type="submit">Search</button>
                     </form>
+                    {% endif %}
                 </div>
             </div>
         </nav>

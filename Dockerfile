@@ -9,11 +9,17 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
-# Set the polygon.io API
+# Set the polygon.io API key
 ENV POLYGON_API_KEY=###
+
+# Set the Tiingo API key
+ENV TIINGO_API_KEY=###
 
 # Set the mongodb host
 ENV MONGODB_HOST=localhost
+
+# Create a volume
+VOLUME /data/market_analysis
 
 COPY . /usr/src/app
 WORKDIR /usr/src/app

@@ -15,13 +15,14 @@ on the db model, we might want to use views on the history data to create a view
 # build an image for the cloud container
 docker buildx build --platform=linux/amd64 -t market_analysis .
 
+# prepare for deployment
 docker tag market_analysis -/market_analysis
 docker push -/market_analysis
 
 # create an internal network for the images
 docker network create analysis_net
 
-#Note: port 8001
+# Note: port 8001
 docker run --net analysis_net --name analysis_py -p 8001:8001 market_analysis
 docker run --net analysis_net --name analysis_mongo -p 27017:27017 mongo
 

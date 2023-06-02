@@ -134,7 +134,7 @@ DATA = {
             "VIV.PA"
         )
     },
-    "INDICES": {"name": "Indices", "list": ("^GSPC", "^DJI", "^IXIC", "^GDAXI", "^FTSE", "^N225")},
+    "INDICES": {"name": "Indices", "list": ("^GSPC", "^DJI", "^IXIC", "^NDX", "^GDAXI", "^FTSE", "^N225")},
     "COMMO": {"name": "Commodities", "list": ("CL=F", "GC=F")},
     "CURR": {"name": "Currencies", "list": ("EURUSD=X", "^TNX", "BTC-USD")},
     "BONDS": {"name": "Bonds", "list": {"^TNX", "LQD", "HYG"}}

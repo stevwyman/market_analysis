@@ -6,6 +6,45 @@ from data.history_dao import History_DAO_Factory, Interval
 
 
 # Create your tests here.
+class Tiingo(TestCase):
+    def setUp(self) -> None:
+        tiingo = DataProvider.objects.create(name="Tiingo")
+        manager = User.objects.create(username="Bernd", role=User.MANAGER)
+        apple = Security.objects.create(
+            symbol="AAPL", name="Apple Inc.", data_provider=tiingo
+        )
+        return super().setUp()
+    
+    def test_request_history(self) -> None:
+        data_provider = DataProvider.objects.get(name="Tiingo")
+        apple = Security.objects.filter(symbol="AAPL", data_provider=data_provider).first()
+        self.assertIsNotNone(apple)
+
+        history_dao = History_DAO_Factory().get_online_dao(data_provider)
+        result = history_dao.lookupHistory(apple)
+        self.assertIsNotNone(result)
+        self.assertGreater(len(result), 10)
+
+# Create your tests here.
+class Polygon(TestCase):
+    def setUp(self) -> None:
+        polygon = DataProvider.objects.create(name="Polygon")
+        manager = User.objects.create(username="Bernd", role=User.MANAGER)
+        apple = Security.objects.create(
+            symbol="AAPL", name="Apple Inc.", data_provider=polygon
+        )
+        return super().setUp()
+    
+    def test_request_history(self) -> None:
+        data_provider = DataProvider.objects.get(name="Polygon")
+        apple = Security.objects.filter(symbol="AAPL", data_provider=data_provider).first()
+        self.assertIsNotNone(apple)
+
+        history_dao = History_DAO_Factory().get_online_dao(data_provider)
+        result = history_dao.lookupHistory(apple)
+        self.assertIsNotNone(result)
+        self.assertGreater(len(result), 10)
+
 class WatchlistViews(TestCase):
     def setUp(self) -> None:
         yahoo = DataProvider.objects.create(name="Yahoo")
@@ -142,8 +181,8 @@ class YahooYCL(TestCase):
         for watchlist in watchlists:
             print(f"listing securities in {watchlist.name}")
             for security in watchlist.securities.all():
-                print(security)
-                print(security.watchlists.all())
+                self.assertIsNotNone(security)
+                self.assertIsNotNone(security.watchlists.all())
 
     def test_historic_import(self):
         data_provider = DataProvider.objects.get(name="Yahoo")

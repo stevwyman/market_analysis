@@ -20,6 +20,7 @@ urlpatterns = [
     path("update_all", views.update_all, name="update_all"),
     path("open_interest/<str:underlying>", views.open_interest, name="open_interest"),
     path("max_pain/<str:underlying>", views.max_pain, name="max_pain"),
+    path("max_pain_distribution/<str:underlying>", views.max_pain_distribution, name="max_pain_distribution"),
 
     # build_data_set
     path("bds", views.build_data_set, name="build_data_set"),
@@ -27,4 +28,11 @@ urlpatterns = [
     # admin 
     # create_default_lists
     path("cdl", views.create_default_lists, name="create_default_list"),
+    # create a S&P 500 list and fill it with data
+    path("cspl", views.create_sp500_list, name="create_sp500_list"),
+
+    # managing participants
+    path("login", views.login_view, name="login"),
+    path("logout", views.logout_view, name="logout"),
+    path("register", views.register, name="register")
 ]

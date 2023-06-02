@@ -83,12 +83,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
-        #"ENGINE": "django.db.backends.mysql",
-        #"user": "familytree",
-        #"password": "familytree",
-        #"host": "localhost",
-        #"database": "familytree",
-        #"raise_on_warnings": True
+        # "NAME": "/data/market_analysis/db.sqlite3"
     }
 }
 

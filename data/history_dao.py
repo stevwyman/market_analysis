@@ -31,6 +31,10 @@ class History_DAO_Factory:
     def get_online_dao(self, data_provider):
         if data_provider.name == "Yahoo":
             return YahooDAO()
+        elif data_provider.name == "Polygon":
+            return PolygonDAO()
+        elif data_provider.name == "Tiingo":
+            return TiingoDAO()
         else:
             raise ValueError(format)
 
@@ -38,13 +42,15 @@ class History_DAO_Factory:
 class YahooDAO:
     _instance = None
     _mongo_db = None
-    _http_client = urllib3.PoolManager()
+    _history_client = None
 
     def __new__(cls):
         if cls._instance is None:
             logger.info("Creating YahooDAO")
             cls._instance = super(YahooDAO, cls).__new__(cls)
             # initialisation
+            #cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
+            cls._history_client = urllib3.PoolManager()
             cls._mongo_db = MetaData_Factory().db("market_analysis")
         return cls._instance
 
@@ -60,7 +66,7 @@ class YahooDAO:
 
         """
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -132,7 +138,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -168,7 +174,7 @@ class YahooDAO:
 
         # print(f"requesting from: {from_time} to: {to_time} with interval: {interval.value}")
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query1.finance.yahoo.com/v7/finance/download/" + security.symbol,
@@ -251,7 +257,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -315,7 +321,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -376,7 +382,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             print("Could not write data to locale storage: ", e)
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -440,7 +446,7 @@ class YahooDAO:
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not write data to local storage: %s" % e)
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://query2.finance.yahoo.com/v10/finance/quoteSummary/" + symbol,
@@ -474,3 +480,275 @@ class YahooDAO:
         else:
             error = summary_profile["quoteSummary"]["error"]
             return {"error": error["description"]}
+
+
+class PolygonDAO: 
+    _instance = None
+    _mongo_db = None
+    _api_key = "###"
+    _http_client = urllib3.PoolManager()
+
+    def __new__(cls):
+        if cls._instance is None:
+            logger.info("Creating PolygonDAO")
+            cls._instance = super(PolygonDAO, cls).__new__(cls)
+            # initialisation
+            cls._api_key = environ.get("POLYGON_API_KEY")
+            cls._mongo_db = MetaData_Factory().db("market_analysis")
+            
+        return cls._instance
+    
+    def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
+        # Contact API
+
+        # data used to complie the query to get the history -> 2year in this case
+        now = datetime.now()
+        fromDate = (now - timedelta(look_back)).strftime('%Y-%m-%d')
+        endDate = now.strftime('%Y-%m-%d')
+
+        logger.debug(f"requesting history for {security} using from:{fromDate} to:{endDate}")
+
+        if interval == Interval.DAILY:
+            range = "/range/1/day/"
+        else:
+            range = "nope"
+
+        http = self._http_client
+        try:
+            r = http.request(
+                "GET",
+                "https://api.polygon.io/v2/aggs/ticker/" + security.symbol + range + fromDate + "/" + endDate,
+                fields={
+                    "adjusted": "true",  # the date to start from in milliseconds
+                    "sort": "asc",  # to date in milliseconds
+                    "apiKey": self._api_key
+                },
+            )
+        except urllib3.error.HTTPError as error:
+            logger.error("HTTP Error: Data not retrieved because %s", error)
+        except urllib3.error.URLError as error:
+            logger.error("URL Error: Data not retrieved because %s", error)
+
+        status_code = r.status
+        logger.debug(
+            "status for requesting 'history' of %s: %s " % (security.symbol, status_code)
+        )
+
+        if status_code != 200:
+            logger.error(f"Could not get receive data, status code: {status_code}")
+            raise ValueError("No data available")
+
+        data = json.loads(r.data.decode("utf-8"))
+        #logger.debug(data)
+    
+        # Parse response
+        historic_entries = list()
+        today = date.today()
+        for row in data["results"]:
+            #logger.debug(row)
+            # date is in timestamp format: 1672117200000
+            date_obj = datetime.fromtimestamp(row["t"]/1000)
+            date_str = datetime.strftime(date_obj, "%Y-%m-%d")
+            # don't add today's value from history, use the price instead
+            if date_str == str(today):
+                continue
+            open_str = row["o"]
+            # some entries only have a date, but not a value i.e. bank holiday
+            if open_str == "null":
+                continue
+            
+            entry = Daily(
+                date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                security=security,
+                open_price=row["o"],
+                high_price=row["h"],
+                low=row["l"],
+                close=row["c"],
+                adj_close=row["c"],
+                volume=row["v"],
+            )
+
+            historic_entries.append(entry)
+
+        return historic_entries
+    
+    def lookupPrice(self, symbol):
+        """
+        returns, if found, the "price" data set
+
+        {"quoteSummary":
+            {"result":[
+                {"price":
+                    {"maxAge":1,
+                    "preMarketChangePercent":{"raw":-0.00954487,"fmt":"-0.95%"},
+                    "preMarketChange":{"raw":-1.60001,"fmt":"-1.60"},
+                    "preMarketTime":1681997399,
+                    "preMarketPrice":{"raw":166.03,"fmt":"166.03"},
+                    "preMarketSource":"FREE_REALTIME",
+                    "postMarketChange":{},
+                    "postMarketPrice":{},
+                    "regularMarketChangePercent":{"raw":-0.0011931766,"fmt":"-0.12%"},
+                    "regularMarketChange":{"raw":-0.2000122,"fmt":"-0.20"},
+                    "regularMarketTime":1682013624,
+                    "priceHint":{"raw":2,"fmt":"2","longFmt":"2"},
+                    "regularMarketPrice":{"raw":167.43,"fmt":"167.43"},
+                    "regularMarketDayHigh":{"raw":167.87,"fmt":"167.87"},
+                    "regularMarketDayLow":{"raw":165.91,"fmt":"165.91"},"regularMarketVolume":{"raw":28145554,"fmt":"28.15M","longFmt":"28,145,554.00"},"averageDailyVolume10Day":{},"averageDailyVolume3Month":{},"regularMarketPreviousClose":{"raw":167.63,"fmt":"167.63"},"regularMarketSource":"FREE_REALTIME","regularMarketOpen":{"raw":166.09,"fmt":"166.09"},"strikePrice":{},"openInterest":{},"exchange":"NMS","exchangeName":"NasdaqGS","exchangeDataDelayedBy":0,"marketState":"REGULAR","quoteType":"EQUITY","symbol":"AAPL","underlyingSymbol":null,
+                    "shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price",
+                    "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
+        """
+        
+        _price = self._mongo_db["polygon_price"]
+        try:
+            # check if we have a price entry in the mongo-db
+            price = _price.find_one({"symbol": symbol})
+            return price["price"]
+        except:
+            logger.warn("No data found for " + symbol)
+            return None
+
+    def storePriceMetadata(self, metadata):
+        _price = self._mongo_db["polygon_price"]
+        try:
+            _data = {"timestamp": datetime.now().timestamp(), "price": metadata}
+            _price.update_one({"symbol": metadata["symbol"]}, {"$set": _data}, upsert=True)
+        except:
+            logger.info("Could not store data")
+
+
+    
+    def lookupSymbol(self, symbol):
+        return None
+        
+
+class TiingoDAO: 
+    _instance = None
+    _mongo_db = None
+    _api_key = "###"
+    _http_client = urllib3.PoolManager()
+
+    def __new__(cls):
+        if cls._instance is None:
+            logger.info("Creating TiingoDAO")
+            cls._instance = super(TiingoDAO, cls).__new__(cls)
+            # initialisation
+            cls._api_key = environ.get("TIINGO_API_KEY")
+            cls._mongo_db = MetaData_Factory().db("market_analysis")
+            
+        return cls._instance
+    
+    def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
+        """
+        returns, if found, the "historic" data set
+        """
+
+        # data used to complie the query to get the history -> 2year in this case
+        now = datetime.now()
+        fromDate = (now - timedelta(look_back)).strftime('%Y-%m-%d')
+        endDate = now.strftime('%Y-%m-%d')
+
+        logger.debug(f"requesting {security.symbol} from: {fromDate} to: {endDate} with interval: {interval.value}")
+
+        http = self._http_client
+        r = http.request(
+            "GET",
+            "https://api.tiingo.com/tiingo/daily/" + security.symbol + "/prices",
+            fields={
+                "startDate": fromDate,  # the date to start from in milliseconds
+                "endDate": endDate,  # to date in milliseconds
+                "format": "csv",
+                "resampleFreq": "daily",
+                "token": self._api_key
+            },
+        )
+
+        logger.debug(
+            "status for requesting 'history' of %s: %s " % (security.symbol, r.status)
+        )
+
+        data = r.data.decode("utf-8")
+
+        logger.debug(data)
+
+        reader = csv.DictReader(StringIO(data), delimiter=",")
+        historic_entries = list()
+        today = date.today()
+        for row in reader:
+            # print(row)
+            date_str = row["date"]
+            # don't add today's value from history, use the price instead
+            if date_str == str(today):
+                continue
+            open_str = row["adjOpen"]
+            # some entries only have a date, but not a value i.e. bank holiday
+            if open_str == "null":
+                continue
+            high_str = row["adjHigh"]
+            low_str = row["adjLow"]
+            close_adj_str = row["adjClose"]
+            close_str = row["adjClose"]
+            volume_str = row["adjVolume"]
+
+            entry = Daily(
+                date=datetime.strptime(date_str, "%Y-%m-%d").date(),
+                security=security,
+                open_price=decimal.Decimal(open_str),
+                high_price=decimal.Decimal(high_str),
+                low=decimal.Decimal(low_str),
+                close=decimal.Decimal(close_str),
+                adj_close=decimal.Decimal(close_adj_str),
+                volume=int(volume_str),
+            )
+
+            historic_entries.append(entry)
+
+        return historic_entries
+    
+    def lookupPrice(self, symbol):
+        """
+        returns, if found, the "price" data set
+
+        {"quoteSummary":
+            {"result":[
+                {"price":
+                    {"maxAge":1,
+                    "preMarketChangePercent":{"raw":-0.00954487,"fmt":"-0.95%"},
+                    "preMarketChange":{"raw":-1.60001,"fmt":"-1.60"},
+                    "preMarketTime":1681997399,
+                    "preMarketPrice":{"raw":166.03,"fmt":"166.03"},
+                    "preMarketSource":"FREE_REALTIME",
+                    "postMarketChange":{},
+                    "postMarketPrice":{},
+                    "regularMarketChangePercent":{"raw":-0.0011931766,"fmt":"-0.12%"},
+                    "regularMarketChange":{"raw":-0.2000122,"fmt":"-0.20"},
+                    "regularMarketTime":1682013624,
+                    "priceHint":{"raw":2,"fmt":"2","longFmt":"2"},
+                    "regularMarketPrice":{"raw":167.43,"fmt":"167.43"},
+                    "regularMarketDayHigh":{"raw":167.87,"fmt":"167.87"},
+                    "regularMarketDayLow":{"raw":165.91,"fmt":"165.91"},"regularMarketVolume":{"raw":28145554,"fmt":"28.15M","longFmt":"28,145,554.00"},"averageDailyVolume10Day":{},"averageDailyVolume3Month":{},"regularMarketPreviousClose":{"raw":167.63,"fmt":"167.63"},"regularMarketSource":"FREE_REALTIME","regularMarketOpen":{"raw":166.09,"fmt":"166.09"},"strikePrice":{},"openInterest":{},"exchange":"NMS","exchangeName":"NasdaqGS","exchangeDataDelayedBy":0,"marketState":"REGULAR","quoteType":"EQUITY","symbol":"AAPL","underlyingSymbol":null,
+                    "shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price",
+                    "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
+        """
+        
+        _price = self._mongo_db["polygon_price"]
+        try:
+            # check if we have a price entry in the mongo-db
+            price = _price.find_one({"symbol": symbol})
+            return price["price"]
+        except:
+            logger.warn("No data found for " + symbol)
+            return None
+
+    def storePriceMetadata(self, metadata):
+        _price = self._mongo_db["polygon_price"]
+        try:
+            _data = {"timestamp": datetime.now().timestamp(), "price": metadata}
+            _price.update_one({"symbol": metadata["symbol"]}, {"$set": _data}, upsert=True)
+        except:
+            logger.info("Could not store data")
+
+
+    
+    def lookupSymbol(self, symbol):
+        return None
+ 

@@ -1,35 +1,64 @@
 <nav aria-label="...">
-    <ul class="pagination">
-      {% if watchlist_entries.has_previous %}
-      <li class="page-item">
-        <a class="page-link" href="?page={{ watchlist_entries.previous_page_number }}&order_by={{ order_by }}&direction={{ direction }}">Previous</a>
-      </li>
-      {% else %}
-      <li class="page-item disabled">
-        <span class="page-link">Previous</span>
-      </li>
-      {% endif %}
+  <ul class="pagination">
+    {% if watchlist_entries.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ watchlist_entries.previous_page_number }}&order_by={{ order_by }}&direction={{ direction }}">Previous</a>
+    </li>
 
-      {% for wle_object in watchlist_entries.paginator %}
-      {% if watchlist_entries.number == wle_object.number %}
-      <li class="page-item active" aria-current="page">
-        <span class="page-link">{{ wle_object.number }}</span>
-      </li>
-      {% else %}
-      <li class="page-item">
-        <a class="page-link" href="?page={{ wle_object.number }}&order_by={{ order_by }}&direction={{ direction }}">{{ wle_object.number }}</a>
-      </li>
+    {% if watchlist_entries.number > 3 %}
+    <li class="page-item">
+      <a class="page-link" href="?page=1&order_by={{ order_by }}&direction={{ direction }}">1</a>
+    </li>
+    {% endif %}
+
+    {% else %}
+    <li class="page-item disabled">
+      <span class="page-link">Previous</span>
+    </li>
+    {% endif %}
+
+
+    {% for num in watchlist_entries.paginator.page_range %}
+      {% if watchlist_entries.number == num %}
+        {% if watchlist_entries.number == num %}
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">{{ num }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}&order_by={{ order_by }}&direction={{ direction }}">{{ num }}</a>
+        </li>
+        {% endif %}
+      {% elif num > watchlist_entries.number|add:'-3' and num < watchlist_entries.number|add:'3' %}
+        {% if watchlist_entries.number == num %}
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">{{ num }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}&order_by={{ order_by }}&direction={{ direction }}">{{ num }}</a>
+        </li>
+        {% endif %}
       {% endif %}
-      {% endfor %}
-        
-      {% if watchlist_entries.has_next %}
+    {% endfor %}
+
+    {% if watchlist_entries.has_next %}
+      {% if watchlist_entries.number < watchlist_entries.paginator.num_pages|add:'-3' %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ watchlist_entries.paginator.num_pages }}&order_by={{ order_by }}&direction={{ direction }}">{{ watchlist_entries.paginator.num_pages }}</a>
+        </li>
+      {% elif watchlist_entries.number < watchlist_entries.paginator.num_pages|add:'-2' %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ watchlist_entries.paginator.num_pages }}&order_by={{ order_by }}&direction={{ direction }}">{{ watchlist_entries.paginator.num_pages }}</a>
+        </li>
+      {% endif %}
       <li class="page-item">
         <a class="page-link" href="?page={{ watchlist_entries.next_page_number }}&order_by={{ order_by }}&direction={{ direction }}">Next</a>
       </li>
-      {% else %}
-      <li class="page-item disabled">
-        <span class="page-link">Next</span>
-      </li>
-      {% endif %}
-    </ul>
-  </nav>
+    {% else %}
+    <li class="page-item disabled">
+      <span class="page-link">Next</span>
+    </li>
+    {% endif %}
+  </ul>
+</nav>

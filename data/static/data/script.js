@@ -192,7 +192,7 @@ function generate_chart(data){
 	
 	var chart = LightweightCharts.createChart(document.querySelector("#chartContainer"), {
 		width: width,
-		  height: height,
+		height: height,
 		layout: {
 			background: {
 				type: 'solid',
@@ -217,7 +217,7 @@ function generate_chart(data){
 		timeScale: {
 			borderColor: 'rgba(197, 203, 206, 0.8)',
 		},
-		/*
+		
 		watermark: {
 			visible: true,
 			fontSize: 32,
@@ -226,7 +226,7 @@ function generate_chart(data){
 			color: 'rgba(171, 71, 188, 0.3)',
 			text: 'wyca-analytics.com',
 		},
-		*/
+		
 	});
 	
 	var ema50 = chart.addLineSeries({
@@ -259,7 +259,7 @@ function generate_chart(data){
 	});
 	bb_upper.setData(data.bb_upper);
 
-
+	/*
 	var macdHistogram = chart.addHistogramSeries({
 		color: '#F2A057',
 		priceFormat: {
@@ -275,6 +275,7 @@ function generate_chart(data){
 			bottom: 0.8,
 		},
 	});
+	*/
 	
 
 	if (data.volume.length > 0){
@@ -293,8 +294,6 @@ function generate_chart(data){
 			},
 		});
 	}
-
-
 
 	var candleSeries = chart.addCandlestickSeries({
 	  upColor: 'rgba(0, 150, 136, 0.8)',
@@ -509,4 +508,8 @@ function generate_max_pain_chart(data){
 		chart.applyOptions({ height: newRect.height, width: newRect.width })
 		})
 	resizeObserver.observe(chartContainer)
+}
+
+function generate_max_pain_distribution(data){
+	
 }

@@ -38,7 +38,9 @@
                         {% if watchlist is not None %}
                         <br>(<a href="?order_by=hurst&direction=desc">&darr;</a><a href="?order_by=hurst&direction=asc">&uarr;</a>)</th>
                         {% endif %}
+                    {% if watchlist.user == user %}
                     <th scope="col" class="d-none d-sm-table-cell"></th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -46,23 +48,21 @@
                 <tr>
                     <td class="d-table-cell d-sm-none"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.symbol }}</a></th>
                     <td class="d-none d-sm-table-cell"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.name }}</a></th>
-                    <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.price.currency_symbol }}&nbsp;{{ watchlist_entry.price.price }}<br>{% load humanize %}{{ watchlist_entry.price.local_timestamp|naturaltime }}</td>
+                    <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.price.currency_symbol }}&nbsp;{{ watchlist_entry.price.price|floatformat:2 }}<br>{% load humanize %}{{ watchlist_entry.price.local_timestamp|naturaltime }}{{ watchlist_entry.price.timestamp }}</td>
                     <td class="text-end">{{ watchlist_entry.price.change_percent|floatformat:2 }}%<br>({{ watchlist_entry.price.change|floatformat:2 }})</td>
                     <td class="text-end">{{ watchlist_entry.pe_forward|floatformat:1 }}</td>
                     <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.sma.delta|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.sd|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.hurst|floatformat:2 }}</td>
+                    {% if watchlist.user == user %}
                     <td class="text-end d-none d-sm-table-cell">
-                        {% if watchlist is not None %}
                         <form action="{% url 'security_drop' watchlist.id %}" method="post">
                             {% csrf_token %}
                             <input type="hidden" name="security_id" value="{{watchlist_entry.security.id}}">
                             <input class="btn btn-outline-warning btn-sm" type="submit" value="drop">
                         </form>
-                        {% else %}
-                            &nbsp;
-                        {% endif %}
                     </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
@@ -73,7 +73,10 @@
 {% if watchlist is not None %}
 <div class="container">
     <div class="row justify-content-md-center">
-        <div class="col-9">{% include "data/pagination.html" %}</div><div class="col-3"><a class="btn btn-outline-warning btn-sm" href="{% url 'security_new' watchlist.id %}">+</a></div>
+        <div class="col">{% include "data/pagination.html" %}</div>
+        {% if watchlist.user == user %}
+        <div class="col"><a class="btn btn-outline-warning btn-sm" href="{% url 'security_new' watchlist.id %}">+</a></div>
+        {% endif %}
     </div>
 </div>
 {% endif %}
