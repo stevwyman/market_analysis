@@ -1,0 +1,61 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+
+<section class="py-5 text-center container">
+    <h1>Limits</h1>
+</section>
+
+<div class="album py-5 bg-light">
+    <div class="container">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
+            {% for entry in cheats %}
+            <div class="col">
+                <div class="card shadow-sm">
+                    <table class="table fw-lighter"">
+                        <tr>
+                            <td colspan="3" class="fw-light">{{ entry.security.name }}</td>
+                            <td><a href="{% url 'limit_new' %}?security_id={{entry.security.id}}" class="btn btn-outline-warning btn-sm" style="--bs-btn-padding-y: .05rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">+</a></td>
+                        </tr>
+
+                        {% for item in entry.entries %}
+                        {% if item.value > entry.current %}
+                        <tr class="table-success">
+                        {% elif item.value < entry.current %}
+                        <tr class="table-danger">
+                        {% else %}
+                        <tr class="table-info">
+                        {% endif %}    
+                            <td>{{ item.name }}</td>
+                            {% if item.modifyable %}
+                            <td><a href="{% url 'limit_edit' item.id %}">{{ item.value|floatformat:2 }}</a></td>
+                            <td><small>({{ item.delta|floatformat:2 }}%)</small></td>
+                            <td><a href="{% url 'limit_drop' item.id %}" class="btn btn-outline-warning btn-sm" style="--bs-btn-padding-y: .05rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">-</a></td>
+                            {% else %}
+                            <td>{{ item.value|floatformat:2 }}</td>
+                            {% if item.delta is not None %}
+                            <td><small>({{ item.delta|floatformat:2 }}%)</small></td>
+                            {% else %}
+                            <td>&nbsp;</td>
+                            {% endif %}
+                            <td>&nbsp;</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        <tr>
+                            <td colspan="4" class="text-center fw-light">{% load humanize %}{{ entry.ts|naturaltime }}</td>
+                        </tr>
+                    </table>
+                    
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div
+
+
+{% endblock %}
+
+

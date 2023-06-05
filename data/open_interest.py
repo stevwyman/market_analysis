@@ -1,12 +1,18 @@
-import urllib3
+import calendar
 import pymongo
+import tabulate
+import time
+import urllib3
+
 from bs4 import BeautifulSoup
 from lxml import etree
 from datetime import date, datetime, timedelta
-import time
-import calendar
 
 from data.meta_dao import MetaData_Factory
+
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 DATE_FORMAT = "%Y%m%d"
 
@@ -20,7 +26,7 @@ class OnlineReader:
         url = generate_url(**parameters)
 
         response = self._http.request("GET", url)
-        print(f"Response for {response.geturl()}: {response.status} ... ")
+        logger.debug(f"Response for {response.geturl()}: {response.status} ... ")
 
         eurex_data = response.data.decode("utf-8")
         parsed_html = BeautifulSoup(eurex_data, features="lxml")
@@ -45,8 +51,7 @@ class OnlineReader:
 
             data.append(row)
 
-        # print(tabulate(data,headers = headers,tablefmt='fancy_grid'))
-
+        
         data_dict = {}
         for row in data:
             try:
@@ -66,15 +71,15 @@ class OnlineReader:
 
         entries = len(data_dict)
         if entries == 0:
-            print("... no data available")
+            logger.debug("... no data available")
         else:
-            print(f"... received {entries} entries")
+            logger.debug(f"... received {entries} entries")
         return {"parameter": parameters, "data": data_dict}
 
 
 class LocaleDAO:
     def __init__(self):
-        _db = MetaData_Factory().db("python_test")
+        _db = MetaData_Factory().db("market_analysis")
         self._collection = _db["open_interest"]
         
 
@@ -90,33 +95,33 @@ class LocaleDAO:
                 )
                 > 0
             ):
-                print(f"Entry exists already.")
+                logger.warn(f"Entry exists already.")
             else:
                 print(
                     f"Adding new entry for {open_interest_data['parameter']['product']['name']} {open_interest_data['parameter']['type']} {open_interest_data['parameter']['bus_date']}"
                 )
                 self._collection.insert_one(open_interest_data)
         except pymongo.errors.ServerSelectionTimeoutError as e:
-            print("Could not write data to locale storage: ", e)
+            logger.error("Could not write data to locale storage: ", e)
         except KeyError:
             pass
 
     def read_all_by_expiry_date(self, parameter: dict) -> list[dict]:
-        # print(f"Using Parameter: {parameter}")
+        logger.debug(f"Using Parameter: {parameter}")
         try:
             return list(self._collection.find(generate_filter_expiry_date(parameter)))
         except pymongo.errors.ServerSelectionTimeoutError as e:
-            print("Could not read data from locale storage: ", e)
+            logger.error("Could not read data from locale storage: ", e)
             return list()
         except KeyError as ke:
             return list()
 
     def read_entry(self, parameter: dict) -> dict:
-        # print(f"Using Parameter: {parameter}")
+        logger.debug(f"Using Parameter: {parameter}")
         try:
             return self._collection.find_one(generate_unique_filter(parameter))
         except pymongo.errors.ServerSelectionTimeoutError as e:
-            print("Could not read data from locale storage: ", e)
+            logger.error("Could not read data from locale storage: ", e)
             return {}
         except KeyError:
             return {}
@@ -157,7 +162,7 @@ def update_data(parameter: dict) -> None:
             locale_dao.write(online_data)
             time.sleep(5)
         else:
-            print(
+            logger.warn(
                 f"Entry already in local storage: {parameter['type']}, {parameter['bus_date']}"
             )
 
@@ -171,7 +176,7 @@ def update_data(parameter: dict) -> None:
             locale_dao.write(online_data)
             time.sleep(5)
         else:
-            print(
+            logger.warn(
                 f"Entry already in local storage: {parameter['type']}, {parameter['bus_date']}"
             )
 
@@ -340,7 +345,7 @@ def get_most_recent_distribution(parameter: dict) -> None:
     max_pain = dict(sorted(max_pain.items(), key=lambda item: item[0]))
 
     max_pain_filtered = dict()
-    print(f"filtering for {min_level} and {max_level}")
+    logger.debug(f"filtering for {min_level} and {max_level}")
     for mp in max_pain:
         if mp < max_level and mp > min_level:
             max_pain_filtered[mp] = max_pain[mp]
@@ -399,7 +404,7 @@ def generate_unique_filter(parameter: dict) -> dict:
             ]
         }
     except KeyError as ke:
-        print(f"Provided parameters are invalid: {parameter}")
+        logger.warn(f"Provided parameters are invalid: {parameter}")
         raise KeyError(ke)
 
 
@@ -419,7 +424,7 @@ def generate_filter_expiry_date(parameter: dict) -> dict:
             ]
         }
     except KeyError as ke:
-        print(f"Provided parameters are invalid: {parameter}")
+        logger.warn(f"Provided parameters are invalid: {parameter}")
         raise KeyError(ke)
 
 
@@ -446,7 +451,7 @@ def next_expiry_date() -> dict:
         if current_month == 12:
             current_year += 1
             current_month = 1
-        print(f"using month: {current_month} and year: {current_year}")
+        logger.debug(f"using month: {current_month} and year: {current_year}")
         expiry_date = c.monthdatescalendar(current_year, current_month)[2][6]
 
     expiry_month = expiry_date.month

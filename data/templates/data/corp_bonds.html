@@ -1,0 +1,60 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+
+<section class="py-5 text-center container">
+	<h1>Corporate Bonds</h1>
+	<span class="fs-2 ms-2">Adv-Dec Line with 5% trend</span>
+</section>
+
+{% csrf_token %}
+
+<div class="container">
+
+	<div class="row py-1">
+		<div class="col col-md-8">
+			<div class="py-2">
+				<ul class="nav nav-tabs">
+					<li class="nav-item">
+						<a class="nav-link" id="cb_hy" onClick="show_corp_bonds('hy')" href="#">High Yield</a>
+					</li>
+					<li class="nav-item">
+						<a class="nav-link" id="cb_ig" onClick="show_corp_bonds('ig')" href="#">Investment Grade</a>
+					</li>
+				  </ul>
+			</div>
+			<div id="chartContainer">
+				<script>
+					show_corp_bonds('hy')
+				</script>
+			</div>
+		</div>
+		<div class="col col-md-4">
+			<div class="fs-6 fw-light py-2" >
+				here should be the comparison
+			</div>
+		</div>
+	</div>
+
+	{% if user.is_authenticated and user.role < 3 %}
+	<div class="row bg-light py-1">
+		<div class="col col-md-8">
+			<div class="col py-2">
+                <form action="{% url 'corp_bonds' %}" method="post">
+                    {% csrf_token %}
+                    <input class="btn btn-sm btn-outline-primary" value="update" type="submit">
+                </form>
+			</div>
+		</div>
+		<div class="col col-md-4">
+			<div class="col py-2">
+				&nbsp;
+			</div>
+		</div>
+	</div>
+	{% endif %}
+	
+</div>
+
+{% endblock %}

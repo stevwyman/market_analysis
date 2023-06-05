@@ -186,3 +186,22 @@ class MonthlyUpdate(HistoryLastUpdate):
                 name="unique_sec_update_monthly_combination",
             )
         ]
+
+class Limit(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    security = models.ForeignKey(Security, on_delete=models.CASCADE)
+    price = models.DecimalField(max_digits=16, decimal_places=6)
+    comment = models.TextField(null=True, blank=True)
+
+    DAILY = 1
+    WEEKLY = 2
+    MONTHLY = 3
+
+    INTERVAL_CHOICES = (
+        (DAILY, "daily"),
+        (WEEKLY, "weekly"),
+        (MONTHLY, "monthly"),
+    )
+    role = models.PositiveSmallIntegerField(
+        choices=INTERVAL_CHOICES, blank=False, null=False, default=DAILY
+    )

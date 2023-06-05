@@ -510,6 +510,117 @@ function generate_max_pain_chart(data){
 	resizeObserver.observe(chartContainer)
 }
 
+
 function generate_max_pain_distribution(data){
 	
+}
+
+
+function show_corp_bonds(type){
+	fetch("/data/corp_bonds_data/" + type, {
+        method: "GET",
+        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
+        mode: "same-origin"
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+				generate_corp_bonds_chart(data)
+
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+}
+
+
+function generate_corp_bonds_chart(data){
+
+	var width = 800;
+	var height = 450;
+
+	document.querySelector("#chartContainer").innerHTML = ''
+	
+	var chart = LightweightCharts.createChart(document.querySelector("#chartContainer"), {
+		width: width,
+		height: height,
+		layout: {
+			background: {
+				type: 'solid',
+				color: '#ffffff',
+			},
+			textColor: 'rgba(47, 79, 79, 0.9)',
+		},
+		grid: {
+			vertLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+			horzLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+		},
+		crosshair: {
+			mode: LightweightCharts.CrosshairMode.Normal,
+		},
+		rightPriceScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		timeScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		
+		watermark: {
+			visible: true,
+			fontSize: 32,
+			horzAlign: 'center',
+			vertAlign: 'center',
+			color: 'rgba(171, 71, 188, 0.3)',
+			text: 'wyca-analytics.com',
+		},
+		
+	});
+
+
+	var ad_line = chart.addLineSeries({
+		color: 'rgba(4, 111, 232, 1)',
+		lineWidth: 2,
+		priceLineVisible: false
+	});
+	var ad_data = data.ad
+	ad_line.setData(ad_data);
+	
+	var ema_line = chart.addLineSeries({
+		color: '#F2A057',
+		lineWidth: 1,
+		priceLineVisible: false
+	});
+	var ema_data = data.trend
+	ema_line.setData(ema_data);
+
+	chart.timeScale().fitContent();
+
+	document.querySelector("#cb_hy").classList.remove("active")
+	document.querySelector("#cb_ig").classList.remove("active")
+
+	if (data.type === "High Yield"){
+		document.querySelector("#cb_hy").classList.add("active")
+	} else if (data.type === "Investment Grade"){
+		document.querySelector("#cb_ig").classList.add("active")
+	}
+
+	// Make Chart Responsive with screen resize
+	const resizeObserver = new ResizeObserver(entries => {
+		if (entries.length === 0 || entries[0].target !== chartContainer) { return }
+		const newRect = entries[0].contentRect
+		chart.applyOptions({ height: newRect.height, width: newRect.width })
+		})
+	resizeObserver.observe(chartContainer)
 }

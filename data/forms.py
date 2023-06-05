@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import TextInput
 
-from .models import Watchlist, Security
+from .models import Watchlist, Security, Limit
 
 
 class WatchlistForm(forms.ModelForm):
@@ -24,3 +24,13 @@ class SecurityForm(forms.ModelForm):
                 attrs={"placeholder": "symbol"}
             )
         }
+
+class LimitForm(forms.ModelForm):
+    class Meta:
+        model = Limit
+        fields = ["user", "security", "price", "comment", "role"]
+        widgets = {
+            "user": forms.HiddenInput(),
+            "security": forms.HiddenInput()
+            }
+        

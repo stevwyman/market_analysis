@@ -49,7 +49,7 @@ class YahooDAO:
             logger.info("Creating YahooDAO")
             cls._instance = super(YahooDAO, cls).__new__(cls)
             # initialisation
-            #cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
+            # cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
             cls._history_client = urllib3.PoolManager()
             cls._mongo_db = MetaData_Factory().db("market_analysis")
         return cls._instance
@@ -127,8 +127,8 @@ class YahooDAO:
                 entry_ts = price["timestamp"]
                 current_ts = datetime.now().timestamp()
 
-                # if entry_ts + 300 > current_ts:   # for production 5 minutes
-                if entry_ts + 3600 > current_ts:  # for testing 1 hour
+                if entry_ts + 300 > current_ts:   # for production 5 minutes
+                # if entry_ts + 3600 > current_ts:  # for testing 1 hour
                     # print(f"serving price for {symbol} from db")
                     logger.debug("serving price for %s from db" % symbol)
                     return price["price"]
@@ -482,7 +482,7 @@ class YahooDAO:
             return {"error": error["description"]}
 
 
-class PolygonDAO: 
+class PolygonDAO:
     _instance = None
     _mongo_db = None
     _api_key = "###"
@@ -495,18 +495,20 @@ class PolygonDAO:
             # initialisation
             cls._api_key = environ.get("POLYGON_API_KEY")
             cls._mongo_db = MetaData_Factory().db("market_analysis")
-            
+
         return cls._instance
-    
+
     def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
         # Contact API
 
         # data used to complie the query to get the history -> 2year in this case
         now = datetime.now()
-        fromDate = (now - timedelta(look_back)).strftime('%Y-%m-%d')
-        endDate = now.strftime('%Y-%m-%d')
+        fromDate = (now - timedelta(look_back)).strftime("%Y-%m-%d")
+        endDate = now.strftime("%Y-%m-%d")
 
-        logger.debug(f"requesting history for {security} using from:{fromDate} to:{endDate}")
+        logger.debug(
+            f"requesting history for {security} using from:{fromDate} to:{endDate}"
+        )
 
         if interval == Interval.DAILY:
             range = "/range/1/day/"
@@ -517,11 +519,16 @@ class PolygonDAO:
         try:
             r = http.request(
                 "GET",
-                "https://api.polygon.io/v2/aggs/ticker/" + security.symbol + range + fromDate + "/" + endDate,
+                "https://api.polygon.io/v2/aggs/ticker/"
+                + security.symbol
+                + range
+                + fromDate
+                + "/"
+                + endDate,
                 fields={
                     "adjusted": "true",  # the date to start from in milliseconds
                     "sort": "asc",  # to date in milliseconds
-                    "apiKey": self._api_key
+                    "apiKey": self._api_key,
                 },
             )
         except urllib3.error.HTTPError as error:
@@ -531,7 +538,8 @@ class PolygonDAO:
 
         status_code = r.status
         logger.debug(
-            "status for requesting 'history' of %s: %s " % (security.symbol, status_code)
+            "status for requesting 'history' of %s: %s "
+            % (security.symbol, status_code)
         )
 
         if status_code != 200:
@@ -539,15 +547,15 @@ class PolygonDAO:
             raise ValueError("No data available")
 
         data = json.loads(r.data.decode("utf-8"))
-        #logger.debug(data)
-    
+        # logger.debug(data)
+
         # Parse response
         historic_entries = list()
         today = date.today()
         for row in data["results"]:
-            #logger.debug(row)
+            # logger.debug(row)
             # date is in timestamp format: 1672117200000
-            date_obj = datetime.fromtimestamp(row["t"]/1000)
+            date_obj = datetime.fromtimestamp(row["t"] / 1000)
             date_str = datetime.strftime(date_obj, "%Y-%m-%d")
             # don't add today's value from history, use the price instead
             if date_str == str(today):
@@ -556,7 +564,7 @@ class PolygonDAO:
             # some entries only have a date, but not a value i.e. bank holiday
             if open_str == "null":
                 continue
-            
+
             entry = Daily(
                 date=datetime.strptime(date_str, "%Y-%m-%d").date(),
                 security=security,
@@ -571,7 +579,7 @@ class PolygonDAO:
             historic_entries.append(entry)
 
         return historic_entries
-    
+
     def lookupPrice(self, symbol):
         """
         returns, if found, the "price" data set
@@ -597,7 +605,7 @@ class PolygonDAO:
                     "shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price",
                     "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
         """
-        
+
         _price = self._mongo_db["polygon_price"]
         try:
             # check if we have a price entry in the mongo-db
@@ -611,17 +619,17 @@ class PolygonDAO:
         _price = self._mongo_db["polygon_price"]
         try:
             _data = {"timestamp": datetime.now().timestamp(), "price": metadata}
-            _price.update_one({"symbol": metadata["symbol"]}, {"$set": _data}, upsert=True)
+            _price.update_one(
+                {"symbol": metadata["symbol"]}, {"$set": _data}, upsert=True
+            )
         except:
             logger.info("Could not store data")
 
-
-    
     def lookupSymbol(self, symbol):
         return None
-        
 
-class TiingoDAO: 
+
+class TiingoDAO:
     _instance = None
     _mongo_db = None
     _api_key = "###"
@@ -634,9 +642,9 @@ class TiingoDAO:
             # initialisation
             cls._api_key = environ.get("TIINGO_API_KEY")
             cls._mongo_db = MetaData_Factory().db("market_analysis")
-            
+
         return cls._instance
-    
+
     def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
         """
         returns, if found, the "historic" data set
@@ -644,10 +652,12 @@ class TiingoDAO:
 
         # data used to complie the query to get the history -> 2year in this case
         now = datetime.now()
-        fromDate = (now - timedelta(look_back)).strftime('%Y-%m-%d')
-        endDate = now.strftime('%Y-%m-%d')
+        fromDate = (now - timedelta(look_back)).strftime("%Y-%m-%d")
+        endDate = now.strftime("%Y-%m-%d")
 
-        logger.debug(f"requesting {security.symbol} from: {fromDate} to: {endDate} with interval: {interval.value}")
+        logger.debug(
+            f"requesting {security.symbol} from: {fromDate} to: {endDate} with interval: {interval.value}"
+        )
 
         http = self._http_client
         r = http.request(
@@ -658,7 +668,7 @@ class TiingoDAO:
                 "endDate": endDate,  # to date in milliseconds
                 "format": "csv",
                 "resampleFreq": "daily",
-                "token": self._api_key
+                "token": self._api_key,
             },
         )
 
@@ -703,7 +713,7 @@ class TiingoDAO:
             historic_entries.append(entry)
 
         return historic_entries
-    
+
     def lookupPrice(self, symbol):
         """
         returns, if found, the "price" data set
@@ -729,7 +739,7 @@ class TiingoDAO:
                     "shortName":"Apple Inc.","longName":"Apple Inc.","currency":"USD","quoteSourceName":"Nasdaq Real Time Price",
                     "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
         """
-        
+
         _price = self._mongo_db["polygon_price"]
         try:
             # check if we have a price entry in the mongo-db
@@ -743,12 +753,11 @@ class TiingoDAO:
         _price = self._mongo_db["polygon_price"]
         try:
             _data = {"timestamp": datetime.now().timestamp(), "price": metadata}
-            _price.update_one({"symbol": metadata["symbol"]}, {"$set": _data}, upsert=True)
+            _price.update_one(
+                {"symbol": metadata["symbol"]}, {"$set": _data}, upsert=True
+            )
         except:
             logger.info("Could not store data")
 
-
-    
     def lookupSymbol(self, symbol):
         return None
- 

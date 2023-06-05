@@ -1,5 +1,5 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 EXPOSE 8001
 
@@ -16,7 +16,7 @@ ENV POLYGON_API_KEY=###
 ENV TIINGO_API_KEY=###
 
 # Set the mongodb host
-ENV MONGODB_HOST=localhost
+ENV MONGODB_HOST=mongo
 
 # Create a volume
 VOLUME /data/market_analysis

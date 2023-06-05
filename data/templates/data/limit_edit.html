@@ -1,0 +1,16 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+
+{% load django_bootstrap5 %}
+
+<div class="container">
+    <form action="{% url 'limit_edit' limit_id %}" method="post"> 
+        {% csrf_token %}
+        {{ form.as_div }}
+        <button class="btn btn-primary" type="submit">edit</button>
+    </form>
+</div>
+
+{% endblock %}
