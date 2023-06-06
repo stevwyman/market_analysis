@@ -188,9 +188,9 @@ class LocaleDAO:
             return list(cursor)
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not read data from locale storage: ", e)
-            return {}
+            return list()
         except KeyError as ke:
-            return {}
+            return list()
 
     def read(self, limit: int) -> list[dict]:
         """
@@ -201,9 +201,9 @@ class LocaleDAO:
             return sorted(list(cursor), key=lambda d: d["date"])
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not read data from locale storage: ", e)
-            return {}
+            return list()
         except KeyError as ke:
-            return {}
+            return list()
 
     def read_by_dates(self, start_date: int, end_date: int) -> list[dict]:
         """
@@ -215,9 +215,9 @@ class LocaleDAO:
             return sorted(list(cursor), key=lambda d: d["date"])
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not read data from locale storage: ", e)
-            return {}
+            return list()
         except KeyError as ke:
-            return {}
+            return list()
 
     def read_by_date(self, date: int) -> dict:
         """
@@ -227,9 +227,9 @@ class LocaleDAO:
             return self._collection.find_one({"date": date})
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not read data from locale storage: ", e)
-            return None
+            return dict()
         except KeyError:
-            return None
+            return dict()
 
     def most_recent(self) -> datetime:
         recent_entry = self.read(1)
@@ -296,7 +296,7 @@ def read_bonds_data(type: str, ad_ema=39) -> dict:
     local_dao = LocaleDAO()
     ad_history = local_dao.read(250)
 
-    data = {}
+    data = dict()
     data["type"] = type
 
     previous_ad = 100000
@@ -312,22 +312,12 @@ def read_bonds_data(type: str, ad_ema=39) -> dict:
         date = datetime.strptime(str(ad_data["date"]), LOCAL_DATE_FORMAT)
 
         current_ad = adv - dec + previous_ad
-
-        ad_entry = {}
-        ad_entry["time"] = str(date)
-        ad_entry["value"] = current_ad
-        ad_line.append(ad_entry)
+        ad_line.append({"time": str(date), "value": current_ad})
 
         trend_value = trend.add(current_ad)
         if trend_value is not None:
-            trend_entry = {}
-            trend_entry["time"] = str(date)
-            trend_entry["value"] = trend_value
-            trend_line.append(trend_entry)
+            trend_line.append({"time": str(date), "value": trend_value})
         
         previous_ad = current_ad
 
-    data["ad"] = ad_line
-    data["trend"] = trend_line
-
-    return data
+    return {"ad": ad_line, "trend": trend_line}

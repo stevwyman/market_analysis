@@ -2,7 +2,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
 from django.http import HttpResponseRedirect, JsonResponse
@@ -45,11 +45,31 @@ from .models import (
 from .forms import WatchlistForm, SecurityForm, LimitForm
 from .helper import humanize_price, humanize_fundamentals
 
+from typing import Union, List, Dict
+
+ChartingData = Union[Dict[str, str], Dict[str, List[str]]]
+
 
 # Create your views here.
 
 RGB_RED = "rgba(255,82,82, 0.8)"
 RGB_GREEN = "rgba(0, 150, 136, 0.8)"
+
+# some decorators for user role management
+
+
+def is_premium(user) -> bool:
+    """
+    checks if the user is at least premium
+    """
+    return True if user.role < 3 else False
+
+
+def is_manager(user) -> bool:
+    """
+    checks if the user is at least manager
+    """
+    return True if user.role < 2 else False
 
 
 # main page get's rendered here
@@ -57,6 +77,7 @@ def index(request):
     return render(request, "data/index.html")
 
 
+@login_required()
 def start(request):
     cheats = list()
 
@@ -109,13 +130,47 @@ def start(request):
             ema20_value = ema20.add(float(entry.close))
             bb_entry = bb.add(float(entry.close))
 
-        entries.append({"name": "ema(50)", "value": ema50_value, "delta": 100 * (ema50_value - current)/current, "modifyable": False})
-        entries.append({"name": "ema(200)", "value": ema200_value, "delta": 100 * (ema200_value - current)/current, "modifyable": False})
-        entries.append({"name": "ema(20)", "value": ema20_value, "delta": 100 * (ema20_value - current)/current, "modifyable": False})
-        entries.append({"name": "bb upper", "value": bb_entry[1], "delta": 100 * (bb_entry[1] - current)/current, "modifyable": False})
-        entries.append({"name": "bb lower", "value": bb_entry[0], "delta": 100 * (bb_entry[0] - current)/current, "modifyable": False})
+        entries.append(
+            {
+                "name": "ema(50)",
+                "value": ema50_value,
+                "delta": 100 * (ema50_value - current) / current,
+                "modifyable": False,
+            }
+        )
+        entries.append(
+            {
+                "name": "ema(200)",
+                "value": ema200_value,
+                "delta": 100 * (ema200_value - current) / current,
+                "modifyable": False,
+            }
+        )
+        entries.append(
+            {
+                "name": "ema(20)",
+                "value": ema20_value,
+                "delta": 100 * (ema20_value - current) / current,
+                "modifyable": False,
+            }
+        )
+        entries.append(
+            {
+                "name": "bb upper",
+                "value": bb_entry[1],
+                "delta": 100 * (bb_entry[1] - current) / current,
+                "modifyable": False,
+            }
+        )
+        entries.append(
+            {
+                "name": "bb lower",
+                "value": bb_entry[0],
+                "delta": 100 * (bb_entry[0] - current) / current,
+                "modifyable": False,
+            }
+        )
 
-        
         # user specific details
         limits = Limit.objects.filter(user=user, security=security).all()
         for limit in limits:
@@ -123,7 +178,7 @@ def start(request):
                 {
                     "name": limit.comment,
                     "value": limit.price,
-                    "delta": 100 * (float(limit.price) - current)/current,
+                    "delta": 100 * (float(limit.price) - current) / current,
                     "modifyable": True,
                     "id": limit.id,
                 }
@@ -133,14 +188,36 @@ def start(request):
         cheat["ts"] = datetime.fromtimestamp(
             price["regularMarketTime"], ZoneInfo("America/New_York")
         )
-        
+
         cheats.append(cheat)
 
     return render(request, "data/start.html", {"cheats": cheats})
 
 
-def limit_new(request):
+@login_required()
+def intraday_data(request, notation_id):
+    try:
+        onvista_dp = DataProvider.objects.get(name="Onvista")
+    except ObjectDoesNotExist:
+        onvista_dp = DataProvider.objects.create(name="Onvista")
 
+    onvista = History_DAO_Factory().get_online_dao(onvista_dp)
+    result = onvista.lookupIntraday(notation_id)
+    data = dict()
+    intraday_data = list()
+    for key in result["price"]:
+        for value in result["datetimePrice"]:
+            intraday_data.append({"time": value + 7200, "value": key})
+            result["datetimePrice"].remove(value)
+            break
+
+    data["inraday_data"] = sorted(intraday_data, key=lambda d: d["time"])
+
+    return JsonResponse(data, status=201)
+
+
+@login_required()
+def limit_new(request):
     # user requesting a new limit
     user = request.user
 
@@ -154,7 +231,7 @@ def limit_new(request):
         except ObjectDoesNotExist:
             messages.warning(request, "Security not found")
             return HttpResponseRedirect(reverse("start"))
-        
+
         form = LimitForm(initial={"user": user, "security": security})
         return render(request, "data/limit_new.html", {"form": form})
     else:
@@ -170,6 +247,7 @@ def limit_new(request):
         return HttpResponseRedirect(reverse("start"))
 
 
+@login_required()
 def limit_edit(request, limit_id):
     try:
         limit = Limit.objects.get(pk=limit_id)
@@ -186,9 +264,11 @@ def limit_edit(request, limit_id):
             return HttpResponseRedirect(reverse("start"))
     # either if "GET" or not valid, show the edit page (again)
     form = LimitForm(instance=limit)
+
     return render(request, "data/limit_edit.html", {"form": form, "limit_id": limit.id})
 
 
+@login_required()
 def limit_drop(request, limit_id):
     try:
         limit = Limit.objects.get(pk=limit_id)
@@ -202,28 +282,33 @@ def limit_drop(request, limit_id):
         return HttpResponseRedirect(reverse("start"))
 
 
-@login_required(login_url="login")
+@login_required()
 def watchlists(request):
     user = request.user
     watchlists = list()
 
     for watchlist in Watchlist.objects.filter(visibility="AU").all():
-        watchlists.append(watchlist)
+        if watchlist not in watchlists:
+            watchlists.append(watchlist)
 
     for watchlist in Watchlist.objects.filter(user=user).all():
-        watchlists.append(watchlist)
+        if watchlist not in watchlists:
+            watchlists.append(watchlist)
 
     if user.role != User.BASIC:
         for watchlist in Watchlist.objects.filter(visibility="AP").all():
-            watchlists.append(watchlist)
+            if watchlist not in watchlists:
+                watchlists.append(watchlist)
 
     return render(request, "data/watchlists.html", {"watchlists": watchlists})
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def watchlist_new(request):
     if request.method == "GET":
-        form = WatchlistForm()
+        user = request.user
+        form = WatchlistForm(initial={"user": user})
         return render(request, "data/watchlist_new.html", {"form": form})
     else:
         form = WatchlistForm(request.POST)
@@ -231,29 +316,57 @@ def watchlist_new(request):
             form.save()
             messages.info(request, "Created new watchlist")
         else:
-            print(form.errors.as_data())
+            logger.error(form.errors.as_data())
             messages.error(request, "Could not create new watchlist")
 
         return HttpResponseRedirect(reverse("watchlists"))
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def watchlist_edit(request, watchlist_id):
     try:
-        watchlist = Watchlist.objects.get(pk=watchlist_id)
+        user = request.user
+        watchlist = Watchlist.objects.get(user=user, pk=watchlist_id)
     except ObjectDoesNotExist:
         messages.warning(request, "Watchlist not found")
         return HttpResponseRedirect(reverse("watchlists"))
 
-    if request.method == "GET":
-        form = WatchlistForm(instance=watchlist)
-        return render(request, "data/watchlist_edit.html")
-    else:
-        WatchlistForm(request.POST).save()
-        return HttpResponseRedirect(reverse("watchlists"))
+    if request.method == "POST":
+        form = WatchlistForm(request.POST, instance=watchlist)
+        if form.is_valid():
+            # update the existing `limit` in the database
+            form.save()
+            # redirect to watchlists page
+            return HttpResponseRedirect(reverse("watchlists"))
+
+    # either if "GET" or not valid, show the edit page (again)
+    form = WatchlistForm(instance=watchlist)
+    return render(
+        request,
+        "data/watchlist_edit.html",
+        {"form": form, "watchlist_id": watchlist.id},
+    )
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
+def watchlist_drop(request, watchlist_id):
+    """
+    remove the watchlist
+    """
+    user = request.user
+    try:
+        watchlist = Watchlist.objects.get(user=user, pk=watchlist_id)
+        watchlist.delete()
+        messages.info(request, "Watchlist dropped")
+    except ObjectDoesNotExist:
+        messages.warning(request, "Watchlist not found")
+
+    return HttpResponseRedirect(reverse("watchlists"))
+
+
+@login_required()
 def watchlist(request, watchlist_id: int):
     watchlist = Watchlist.objects.get(pk=watchlist_id)
     securities = watchlist.securities.order_by("name").all()
@@ -342,7 +455,7 @@ def watchlist(request, watchlist_id: int):
     )
 
 
-@login_required(login_url="login")
+@login_required()
 def security(request, security_id):
     """
     return a simple security entry with price
@@ -391,9 +504,10 @@ def security(request, security_id):
     )
 
 
-@login_required(login_url="login")
+@login_required()
 def security_new(request, watchlist_id):
-    watchlist = Watchlist.objects.get(pk=watchlist_id)
+    user = request.user
+    watchlist = Watchlist.objects.get(user=user, pk=watchlist_id)
     if request.method == "GET":
         form = SecurityForm()
         return render(
@@ -409,7 +523,6 @@ def security_new(request, watchlist_id):
             online_dao = History_DAO_Factory().get_online_dao(dataProvider)
 
             price = online_dao.lookupPrice(symbol)
-            # print(price)
             try:
                 messages.warning(request, price["error"])
                 return HttpResponseRedirect(
@@ -467,7 +580,7 @@ def security_new(request, watchlist_id):
                         messages.info(request, "History has been updated")
 
                 except DatabaseError as db_error:
-                    print(db_error)
+                    logger.error(db_error)
                     messages.warning(request, "Error while updating")
 
         else:
@@ -488,8 +601,7 @@ def security_new(request, watchlist_id):
                             reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
                         )
 
-            print("form is not valid")
-            print(form.errors.as_data())  # here you print errors to terminal
+            logger.warn(form.errors.as_data())  # here you print errors to terminal
             messages.error(request, "Form is not valid")
 
         return HttpResponseRedirect(
@@ -497,17 +609,14 @@ def security_new(request, watchlist_id):
         )
 
 
-@login_required(login_url="login")
-def security_drop(request, watchlist_id):
+@login_required()
+@user_passes_test(is_premium, login_url="start")
+def security_drop(request, security_id):
     """
     remove the security from the given watchlist and if no other holds a reference, drop the security and the elated data
     """
-    watchlist = Watchlist.objects.get(pk=watchlist_id)
+    watchlist = Watchlist.objects.get(pk=security_id)
     if request.method == "POST":
-        print(request.body)
-        request.POST.get("security_id", "")
-        # provided_data = json.loads(request.body)
-
         security_id = request.POST.get("security_id", "")
         security = Security.objects.get(pk=security_id)
         watchlist.securities.remove(security)
@@ -515,20 +624,21 @@ def security_drop(request, watchlist_id):
         related_watchlists = security.watchlists.all()
         if related_watchlists.count() == 0:
             security.delete()
-            print(f"removed {security_id}")
+            logger.info(f"removed {security_id}")
+
     return HttpResponseRedirect(
         reverse("watchlist", kwargs={"watchlist_id": watchlist.id})
     )
 
 
-@login_required(login_url="login")
+@login_required()
 def security_search(request) -> JsonResponse:
-    data = {}
+    query = request.POST["id"]
+    if len(query) < 3:
+        messages.warning(request, "provide more letters for a search")
+        return HttpResponseRedirect(reverse("start"))
 
     if request.method == "POST":
-        query = request.POST["id"]
-
-        results = list()
         securities = Security.objects.filter(
             Q(name__contains=query) | Q(symbol__contains=query)
         )
@@ -544,10 +654,11 @@ def security_search(request) -> JsonResponse:
         else:
             if securities.count() == 0:
                 messages.warning(request, "could not find a matching security")
+                return HttpResponseRedirect(reverse("start"))
             else:
-                watchlist_entries = list()
+                watchlist_entries: List = list()
                 for security in securities:
-                    watchlist_entry = {}
+                    watchlist_entry: Dict = dict()
                     watchlist_entry["security"] = security
                     dao = History_DAO_Factory().get_online_dao(security.data_provider)
                     if security.data_provider.name == "Yahoo":
@@ -579,7 +690,8 @@ def security_search(request) -> JsonResponse:
                 )
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def history_update(request, security_id):
     sec = Security.objects.get(pk=security_id)
     interval = request.GET.get("interval", "d")
@@ -596,9 +708,9 @@ def history_update(request, security_id):
         _interval = Interval.MONTHLY
 
     if last_updated is not None:
-        print(f"last update: {last_updated.date}")
+        logger.debug(f"last update: {last_updated.date}")
         if last_updated.date == _today:
-            print("no update required, already updated today")
+            logger.debug("no update required, already updated today")
             messages.info(request, "Already up to date.")
             # forward to security overview page
             return HttpResponseRedirect(
@@ -650,14 +762,14 @@ def history_update(request, security_id):
                     messages.info(request, "Monthly history has been updated")
 
         except DatabaseError as db_error:
-            print(db_error)
+            logger.warn(db_error)
             messages.warning(request, "Error while updating")
 
     # forward to security overview page
     return HttpResponseRedirect(reverse("security", kwargs={"security_id": sec.id}))
 
 
-@login_required(login_url="login")
+@login_required()
 def technical_parameter(request, security_id) -> JsonResponse:
     """
     generate data for charting of technical charts, i.e. sigma/delta, hurst ...
@@ -668,7 +780,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
         provided_data = json.loads(request.body)
         view = provided_data.get("view")
 
-        data = {}
+        data: Dict = dict()
         data["view"] = view
         if view == "sd":
             daily = sec.daily_data.all()[:200]
@@ -680,10 +792,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
                 sma50.add(float(entry.close))
                 sd_value = sma50.sigma_delta()
                 if sd_value is not None:
-                    sd_entry = {}
-                    sd_entry["time"] = str(entry.date)
-                    sd_entry["value"] = sd_value
-                    hurst_data.append(sd_entry)
+                    hurst_data.append({"time": str(entry.date), "value": sd_value})
 
             data["tp_data"] = hurst_data
         elif view == "hurst":
@@ -694,12 +803,9 @@ def technical_parameter(request, security_id) -> JsonResponse:
 
             for entry in reversed(daily):
                 sma50.add(float(entry.close))
-                sd_value = sma50.sigma_delta()
-                if sd_value is not None:
-                    sd_entry = {}
-                    sd_entry["time"] = str(entry.date)
-                    sd_entry["value"] = sma50.hurst()
-                    hurst_data.append(sd_entry)
+                hurst_value = sma50.hurst()
+                if hurst_value is not None:
+                    hurst_data.append({"time": str(entry.date), "value": hurst_value})
 
             data["tp_data"] = hurst_data
 
@@ -708,7 +814,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
         return JsonResponse(data, status=201)
 
 
-@login_required(login_url="login")
+@login_required()
 def tech_analysis(request, security_id) -> JsonResponse:
     """
     generates a dictionary holding the current values for the different technical analysis parameter
@@ -716,7 +822,7 @@ def tech_analysis(request, security_id) -> JsonResponse:
     """
 
     sec = Security.objects.get(pk=security_id)
-    data = {}
+    data: Dict = dict()
     if sec is None:
         data["error", "security has not been found"]
         return JsonResponse(data, status=404)
@@ -739,31 +845,41 @@ def tech_analysis(request, security_id) -> JsonResponse:
         rsi_value = rsi.add(close)
         bb_value = bb.add(close)
 
-    # data[f"EMA(50)[{sec.currency_symbol}]"] = ema50_value
-    data["δEMA(50)[%]"] = 100 * (close - ema50_value) / ema50_value
-    # data[f"EMA(20)[{sec.currency_symbol}]"] = ema20_value
-    data["δEMA(20)[%]"] = 100 * (close - ema20_value) / ema20_value
-    data["MACD <sub>Histogram</sub>"] = macd_value[2]
-    data["RSI"] = rsi_value
-    data["MA(50) spread"] = sma50.sigma_delta()
+    if ema50_value is not None:
+        data["δEMA(50)[%]"] = 100 * (close - ema50_value) / ema50_value
 
-    bb_center = (bb_value[0] + bb_value[1]) / 2
-    bb_position_rel = close - bb_center
-    if bb_position_rel >= 0:  # we are in the upper band
-        data["BBands"] = 100 * bb_position_rel / (bb_value[1] - bb_center)
-    else:
-        data["BBands"] = -100 * bb_position_rel / (bb_value[0] - bb_center)
+    if ema20_value is not None:
+        data["δEMA(20)[%]"] = 100 * (close - ema20_value) / ema20_value
 
-    hurst_value = sma50.hurst()
-    if hurst_value > 0.5:
-        data["Hurst<sub>trending</sub>"] = hurst_value
-    else:
-        data["Hurst<sub>mean rev.</sub>"] = hurst_value
+    if macd_value is not None:
+        data["MACD <sub>Histogram</sub>"] = macd_value[2]
+
+    if rsi_value is not None:
+        data["RSI"] = rsi_value
+
+    sma50_sigma_delta = sma50.sigma_delta()
+    if sma50_sigma_delta is not None:
+        data["MA(50) spread"] = sma50_sigma_delta
+
+    if bb_value is not None:
+        bb_center = (bb_value[0] + bb_value[1]) / 2
+        bb_position_rel = close - bb_center
+        if bb_position_rel >= 0:  # we are in the upper band
+            data["BBands"] = 100 * bb_position_rel / (bb_value[1] - bb_center)
+        else:
+            data["BBands"] = -100 * bb_position_rel / (bb_value[0] - bb_center)
+
+    sma50_hurst = sma50.hurst()
+    if sma50_hurst is not None:
+        if sma50_hurst > 0.5:
+            data["Hurst<sub>trending</sub>"] = sma50_hurst
+        else:
+            data["Hurst<sub>mean rev.</sub>"] = sma50_hurst
 
     return JsonResponse(data, status=201)
 
 
-@login_required(login_url="login")
+@login_required()
 def fundamental_analysis(request, security_id) -> JsonResponse:
     """
     currently only the data is shown, in a next step we could show the reference by sector as well
@@ -784,17 +900,18 @@ def fundamental_analysis(request, security_id) -> JsonResponse:
         return JsonResponse({"error": "no fundamental data available"}, status=404)
 
 
-@login_required(login_url="login")
+@login_required()
 def security_history(request, security_id) -> JsonResponse:
     """
     POST: return a JsonResponse with a data dictionary holding:
         candle - ohlcv, Note: using the lookupPrice, we add the regular market as well
         EMA(50) and EMA(20)
     """
+    data: Dict = dict()
 
     if request.method == "POST":
         security = Security.objects.get(pk=security_id)
-        data = {}
+
         if security is not None:
             data["currency_symbol"] = security.currency_symbol
 
@@ -828,64 +945,50 @@ def security_history(request, security_id) -> JsonResponse:
 
             volume_data = list()
 
-            previous_close = 0
+            previous_close: float = 0
             for entry in reversed(history):
+                close = float(entry.close)
                 # building the prices data using time and ohlc
-                candle = {}
-                candle["time"] = str(entry.date)
-                candle["open"] = float(entry.open_price)
-                candle["high"] = float(entry.high_price)
-                candle["low"] = float(entry.low)
-                candle["close"] = float(entry.close)
-                prices_data.append(candle)
+                prices_data.append(
+                    {
+                        "time": str(entry.date),
+                        "open": float(entry.open_price),
+                        "high": float(entry.high_price),
+                        "low": float(entry.low),
+                        "close": close,
+                    }
+                )
 
-                ema50_value = ema50.add(float(entry.close))
+                ema50_value = ema50.add(close)
                 if ema50_value is not None:
-                    ema50_entry = {}
-                    ema50_entry["time"] = str(entry.date)
-                    ema50_entry["value"] = ema50_value
-                    ema50_data.append(ema50_entry)
+                    ema50_data.append({"time": str(entry.date), "value": ema50_value})
 
-                ema20_value = ema20.add(float(entry.close))
+                ema20_value = ema20.add(close)
                 if ema20_value is not None:
-                    ema20_entry = {}
-                    ema20_entry["time"] = str(entry.date)
-                    ema20_entry["value"] = ema20_value
-                    ema20_data.append(ema20_entry)
+                    ema20_data.append({"time": str(entry.date), "value": ema20_value})
 
                 volume_value = float(entry.volume)
                 if volume_value > 0:
-                    volume = {}
-                    volume["time"] = str(entry.date)
-                    volume["value"] = volume_value
-                    if candle["close"] >= previous_close:
-                        volume["color"] = RGB_GREEN
-                    else:
-                        volume["color"] = RGB_RED
-                    volume_data.append(volume)
+                    volume_data.append(
+                        {
+                            "time": str(entry.date),
+                            "value": volume_value,
+                            "color": RGB_GREEN if close >= previous_close else RGB_RED,
+                        }
+                    )
 
-                bollinger = bb.add(float(entry.close))
+                bollinger = bb.add(close)
                 if bollinger is not None:
-                    bb_lower_entry = {}
-                    bb_lower_entry["time"] = str(entry.date)
-                    bb_lower_entry["value"] = bollinger[0]
+                    bb_lower.append({"time": str(entry.date), "value": bollinger[0]})
+                    bb_upper.append({"time": str(entry.date), "value": bollinger[1]})
 
-                    bb_upper_entry = {}
-                    bb_upper_entry["time"] = str(entry.date)
-                    bb_upper_entry["value"] = bollinger[1]
-
-                    bb_lower.append(bb_lower_entry)
-                    bb_upper.append(bb_upper_entry)
-
-                macd_value = macd.add(float(entry.close))
+                macd_value = macd.add(close)
                 if macd_value is not None:
-                    macd_histo_entry = {}
-                    macd_histo_entry["time"] = str(entry.date)
-                    macd_histo_entry["value"] = macd_value[2]
+                    macd_history_data.append(
+                        {"time": str(entry.date), "value": macd_value[2]}
+                    )
 
-                    macd_history_data.append(macd_histo_entry)
-
-                previous_close = candle["close"]
+                previous_close = close
 
             data["price"] = prices_data
             data["ema50"] = ema50_data
@@ -926,7 +1029,8 @@ def security_history(request, security_id) -> JsonResponse:
     return JsonResponse(data, status=status)
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_manager, login_url="start")
 def update_all(request):
     data = {}
 
@@ -973,7 +1077,8 @@ def update_all(request):
 import pandas as pd
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_manager, login_url="start")
 def build_data_set(request) -> JsonResponse:
     """
     building a data structure that can be used as input for an AI algorithm
@@ -1005,7 +1110,8 @@ underlyings = {
 }
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def open_interest(request, underlying: str):
     if underlying in underlyings.keys():
         product = underlyings[underlying]
@@ -1045,12 +1151,13 @@ def open_interest(request, underlying: str):
     )
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def max_pain(request, underlying: str) -> JsonResponse:
     """
     returning a (time:value) dictionary showing the maxpain value by date
     """
-    data = {}
+    data: Dict = dict()
     if underlying in underlyings.keys():
         product = underlyings[underlying]
     else:
@@ -1060,13 +1167,13 @@ def max_pain(request, underlying: str) -> JsonResponse:
     expiry_date = next_expiry_date()
     parameter = {"product": product, "expiry_date": expiry_date}
 
-    logger.info(parameter)
+    logger.debug(parameter)
 
     max_pain_over_time = sorted(
         get_max_pain_history(parameter), key=lambda x: x[0], reverse=False
     )
 
-    mp = list()
+    mp: List = list()
 
     for max_pain in max_pain_over_time:
         entry = {}
@@ -1079,7 +1186,8 @@ def max_pain(request, underlying: str) -> JsonResponse:
     return JsonResponse(data, status=200)
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def max_pain_distribution(request, underlying: str) -> JsonResponse:
     """
     returning a dataset showing the distribution over strikes for a specific day
@@ -1107,7 +1215,8 @@ from data.corp_bonds import update, read_bonds_data
 bonds = {"hy": "High Yield", "ig": "Investment Grade"}
 
 
-# @login_required(login_url="login")
+# @login_required()
+@user_passes_test(is_premium, login_url="start")
 def corp_bonds(request):
     """
     for a get request, share the latest data
@@ -1129,7 +1238,8 @@ def corp_bonds(request):
         return render(request, "data/corp_bonds.html", data)
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_premium, login_url="start")
 def corp_bonds_data(request, type: str) -> JsonResponse:
     """
     returning a (time:value) dictionary showing the data specified by the 'type' (a-d line) value by date
@@ -1205,7 +1315,8 @@ def register(request):
 from data.indices import DATA
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_manager, login_url="start")
 def create_default_lists(request):
     """
     simple action to initialize the database with a hand full of indices
@@ -1217,7 +1328,7 @@ def create_default_lists(request):
         admin = User(username="myAdmin", email="admin@admin.de", password="_admin-123")
         admin.role = 1
         admin.save()
-        print(f"User {admin} created")
+        logger.info(f"User {admin} created")
 
     try:
         data_provider = DataProvider.objects.get(name="Yahoo")
@@ -1226,7 +1337,7 @@ def create_default_lists(request):
             name="Yahoo", description="Provider for finance.yahoo.com"
         )
         data_provider.save()
-        print(f"Data provider {data_provider} created")
+        logger.info(f"Data provider {data_provider} created")
 
     # looking up additional information
     online_dao = History_DAO_Factory().get_online_dao(data_provider)
@@ -1242,7 +1353,7 @@ def create_default_lists(request):
         except ObjectDoesNotExist:
             watchlist = Watchlist(name=name, user=admin, visibility="AP")
             watchlist.save()
-            print(f"created {watchlist}")
+            logger.info(f"created {watchlist}")
 
         # add securities to watchlist
         for symbol in list:
@@ -1252,7 +1363,7 @@ def create_default_lists(request):
             try:
                 sec = Security.objects.get(symbol=symbol, data_provider=data_provider)
                 watchlist.securities.add(sec)
-                print(f"added {sec} to {watchlist}")
+                logger.info(f"added {sec} to {watchlist}")
                 continue
             except ObjectDoesNotExist:
                 logger.info("Processing " + symbol)
@@ -1274,7 +1385,7 @@ def create_default_lists(request):
 
             sec.save()
             watchlist.securities.add(sec)
-            print(f"added {sec} to {watchlist}")
+            logger.info(f"added {sec} to {watchlist}")
 
     return JsonResponse({"status": "all done"}, status=201)
 
@@ -1282,7 +1393,8 @@ def create_default_lists(request):
 from data.sp500_helper import import_sp500
 
 
-@login_required(login_url="login")
+@login_required()
+@user_passes_test(is_manager, login_url="start")
 def create_sp500_list(request):
     import_sp500()
     return JsonResponse({"status": "all done"}, status=201)

@@ -97,7 +97,7 @@ class LocaleDAO:
             ):
                 logger.warn(f"Entry exists already.")
             else:
-                print(
+                logger.info(
                     f"Adding new entry for {open_interest_data['parameter']['product']['name']} {open_interest_data['parameter']['type']} {open_interest_data['parameter']['bus_date']}"
                 )
                 self._collection.insert_one(open_interest_data)
@@ -268,7 +268,7 @@ def get_max_pain_history(parameter: dict) -> list:
     return max_pain_over_time
 
 
-def get_most_recent_distribution(parameter: dict) -> None:
+def get_most_recent_distribution(parameter: dict) -> dict:
     
     max_pain_over_time = sorted(
         get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
@@ -446,7 +446,7 @@ def next_expiry_date() -> dict:
     expiry_date = c.monthdatescalendar(current_year, current_month)[2][6]
 
     if now > expiry_date:
-        print(f" we are already past expiry, using next month")
+        logger.info(f" we are already past expiry, using next month")
         current_month += 1
         if current_month == 12:
             current_year += 1

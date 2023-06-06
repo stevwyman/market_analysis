@@ -37,6 +37,7 @@
                                 Watchlists
                             </a>
                             <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'watchlists' %}">-- all --</a></li>
                                 {% for watchlist in watchlists %}
                                 <li><a class="dropdown-item" href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a></li>
                                 {% endfor %}

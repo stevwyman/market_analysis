@@ -1,9 +1,24 @@
 from django.test import TestCase, Client
 from django.contrib.messages import get_messages
+from django.urls import reverse
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
 from data.history_dao import History_DAO_Factory, Interval
 
+"""
+Note, due to limitations on the API keys, we have disabled the Polygon and Tiingo tests
+"""
+
+class Onvista(TestCase):
+    def setUp(self) -> None:
+        onvista = DataProvider.objects.create(name="Onvista")
+        return super().setUp()
+    
+    def test_intraday(self) -> None:
+        data_provider = DataProvider.objects.get(name="Onvista")
+        history_dao = History_DAO_Factory().get_online_dao(data_provider)
+        result = history_dao.lookupIntraday("12105789")
+        self.assertIsNotNone(result)
 
 # Create your tests here.
 class Tiingo(TestCase):
@@ -15,7 +30,7 @@ class Tiingo(TestCase):
         )
         return super().setUp()
     
-    def test_request_history(self) -> None:
+    def request_history(self) -> None:
         data_provider = DataProvider.objects.get(name="Tiingo")
         apple = Security.objects.filter(symbol="AAPL", data_provider=data_provider).first()
         self.assertIsNotNone(apple)
@@ -35,7 +50,7 @@ class Polygon(TestCase):
         )
         return super().setUp()
     
-    def test_request_history(self) -> None:
+    def request_history(self) -> None:
         data_provider = DataProvider.objects.get(name="Polygon")
         apple = Security.objects.filter(symbol="AAPL", data_provider=data_provider).first()
         self.assertIsNotNone(apple)
@@ -56,6 +71,10 @@ class WatchlistViews(TestCase):
 
         client = Client()
         response = client.get("/data/watchlists")
+        self.assertRedirects(response, "/data/login?next=/data/watchlists")
+        
+        client.force_login(manager)
+        response = client.get("/data/watchlists")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["watchlists"]), 0)
 
@@ -73,6 +92,7 @@ class WatchlistViews(TestCase):
         manager = User.objects.filter(username="Bernd").all()[0]
 
         client = Client()
+        client.force_login(manager)
 
         response = client.post(
             "/data/watchlist_new",
@@ -85,8 +105,7 @@ class WatchlistViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context["watchlists"]), 1)
 
-        watchlist_id = response.context["watchlists"].first().pk
-        print(f"using watchlist id: {watchlist_id}")
+        watchlist_id = response.context["watchlists"][0].pk
 
         response = client.get("/data/security_new/" + str(watchlist_id))
         self.assertEqual(response.status_code, 200)
@@ -120,8 +139,7 @@ class WatchlistViews(TestCase):
 
     def test_technical_parameter(self) -> None:
         yahoo = DataProvider.objects.create(name="Yahoo")
-        manager = User.objects.create(role=User.MANAGER)
-
+       
         apple = Security.objects.create(
             symbol="AAPL", name="Apple Inc.", data_provider=yahoo
         )
@@ -140,7 +158,7 @@ class WatchlistViews(TestCase):
         client = Client(enforce_csrf_checks=True)
         response = client.post("/data/tp/" + str(apple.pk), data={"view": "sd"})
         self.assertEqual(response.status_code, 403)  ## TODO csrf test
-        print(response)
+
 
 
 class YahooYCL(TestCase):
@@ -179,7 +197,6 @@ class YahooYCL(TestCase):
         watchlists = Watchlist.objects.all()
 
         for watchlist in watchlists:
-            print(f"listing securities in {watchlist.name}")
             for security in watchlist.securities.all():
                 self.assertIsNotNone(security)
                 self.assertIsNotNone(security.watchlists.all())
@@ -197,8 +214,8 @@ class YahooYCL(TestCase):
 
         for security in watchlist.securities.all():
             daily = security.daily_data
-            print(f"{security.symbol} daily has {daily.count()} entries")
-
+            self.assertGreaterEqual(daily.count(), 4)
+           
     def test_read_quote_summary(self):
         data_provider = DataProvider.objects.get(name="Yahoo")
         history_dao = History_DAO_Factory().get_online_dao(data_provider)

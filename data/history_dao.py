@@ -5,6 +5,7 @@ from io import StringIO
 import decimal
 
 import pymongo
+import typing
 
 from django.conf import settings
 
@@ -35,6 +36,8 @@ class History_DAO_Factory:
             return PolygonDAO()
         elif data_provider.name == "Tiingo":
             return TiingoDAO()
+        elif data_provider.name == "Onvista":
+            return OnvistaDAO()
         else:
             raise ValueError(format)
 
@@ -761,3 +764,43 @@ class TiingoDAO:
 
     def lookupSymbol(self, symbol):
         return None
+
+
+class OnvistaDAO:
+    _instance = None
+    _history_client = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            logger.info("Creating OnvistaDAO")
+            cls._instance = super(OnvistaDAO, cls).__new__(cls)
+            # initialisation
+            # cls._history_client = urllib3.HTTPConnectionPool("api.onvista.de", maxsize=10)
+            cls._history_client = urllib3.PoolManager()
+        return cls._instance
+
+    def lookupIntraday(self, notation_id) -> dict:
+        """
+        returns, if found, the "intraday" data set
+        """
+
+        http = self._history_client
+        r = http.request(
+            "GET",
+            f"https://api.onvista.de/api/v1/instruments/INDEX/{notation_id}/times_and_sales",
+            fields={
+                "idNotation": notation_id,
+                "order": "DESC"
+            },
+            headers={"Content-Type":"application/json"}
+        )
+
+        result = json.loads(r.data.decode("utf-8"))
+
+        logger.debug(
+            "status for requesting 'summary profile' of %s: %s " % (notation_id, r.status)
+        )
+
+        return result
+
+        

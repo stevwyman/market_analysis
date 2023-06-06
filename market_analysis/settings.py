@@ -82,12 +82,13 @@ WSGI_APPLICATION = "market_analysis.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        # "NAME": BASE_DIR / "db.sqlite3",
-        "NAME": "/data/market_analysis/db.sqlite3"
+        "NAME": BASE_DIR / "db.sqlite3",
+        # "NAME": "/data/market_analysis/db.sqlite3"
     }
 }
 
 AUTH_USER_MODEL = 'data.User'
+LOGIN_URL = "login"
 
 
 # Password validation
@@ -156,6 +157,6 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "INFO",
+        "level": "DEBUG",
     },
 }

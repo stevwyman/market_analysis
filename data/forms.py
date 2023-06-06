@@ -11,11 +11,16 @@ class WatchlistForm(forms.ModelForm):
         widgets = {
             "name": TextInput(
                 attrs={"placeholder": "new watchlist name"}
-            )
+            ),
+            "user": forms.HiddenInput()
         }
 
 
 class SecurityForm(forms.ModelForm):
+
+    def clean_symbol(self):
+        return self.cleaned_data["symbol"].upper()
+    
     class Meta:
         model = Security
         fields = ["symbol", "data_provider"]

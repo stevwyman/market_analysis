@@ -8,7 +8,7 @@
 <div class="container">
     <form action="{% url 'limit_edit' limit_id %}" method="post"> 
         {% csrf_token %}
-        {{ form.as_div }}
+        {% bootstrap_form form %}
         <button class="btn btn-primary" type="submit">edit</button>
     </form>
 </div>

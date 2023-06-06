@@ -6,11 +6,15 @@
     <h1>Watchlists</h1>
 </section>
 <div class="container">
-    {% for watchlist in watchlists %}
-    <div>
-        <a href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a>
-    </div>
-    {% endfor %}
+    <table>
+        {% for watchlist in watchlists %}
+        <tr>
+            <td><a href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a></td>
+            <td><a href="{% url 'watchlist_edit' watchlist.id %}">edit</a></td>
+            <td><a href="{% url 'watchlist_drop' watchlist.id %}">drop</a></td>
+        </tr>
+        {% endfor %}
+    </table>
 </div>
 
 {% endblock %}
