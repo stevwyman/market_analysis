@@ -296,9 +296,6 @@ def read_bonds_data(type: str, ad_ema=39) -> dict:
     local_dao = LocaleDAO()
     ad_history = local_dao.read(250)
 
-    data = dict()
-    data["type"] = type
-
     previous_ad = 100000
     ad_line = list()
     trend_line = list()
@@ -320,4 +317,4 @@ def read_bonds_data(type: str, ad_ema=39) -> dict:
         
         previous_ad = current_ad
 
-    return {"ad": ad_line, "trend": trend_line}
+    return {"ad": ad_line, "trend": trend_line, "type":type}

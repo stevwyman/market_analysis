@@ -775,8 +775,8 @@ class OnvistaDAO:
             logger.info("Creating OnvistaDAO")
             cls._instance = super(OnvistaDAO, cls).__new__(cls)
             # initialisation
-            # cls._history_client = urllib3.HTTPConnectionPool("api.onvista.de", maxsize=10)
-            cls._history_client = urllib3.PoolManager()
+            #cls._history_client = urllib3.HTTPConnectionPool("api.onvista.de", maxsize=10)
+            cls._history_client = urllib3.PoolManager(maxsize=10)
         return cls._instance
 
     def lookupIntraday(self, notation_id) -> dict:
@@ -798,7 +798,7 @@ class OnvistaDAO:
         result = json.loads(r.data.decode("utf-8"))
 
         logger.debug(
-            "status for requesting 'summary profile' of %s: %s " % (notation_id, r.status)
+            "status for requesting 'lookup intraday' of %s: %s " % (notation_id, r.status)
         )
 
         return result

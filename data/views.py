@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 
@@ -43,7 +43,7 @@ from .models import (
     Limit,
 )
 from .forms import WatchlistForm, SecurityForm, LimitForm
-from .helper import humanize_price, humanize_fundamentals
+from .helper import humanize_price, humanize_fundamentals, generate_intraday_image
 
 from typing import Union, List, Dict
 
@@ -79,6 +79,7 @@ def index(request):
 
 @login_required()
 def start(request):
+
     cheats = list()
 
     # we use yahoo as we get near real time
@@ -191,29 +192,12 @@ def start(request):
 
         cheats.append(cheat)
 
-    return render(request, "data/start.html", {"cheats": cheats})
-
-
-@login_required()
-def intraday_data(request, notation_id):
-    try:
-        onvista_dp = DataProvider.objects.get(name="Onvista")
-    except ObjectDoesNotExist:
-        onvista_dp = DataProvider.objects.create(name="Onvista")
-
-    onvista = History_DAO_Factory().get_online_dao(onvista_dp)
-    result = onvista.lookupIntraday(notation_id)
-    data = dict()
-    intraday_data = list()
-    for key in result["price"]:
-        for value in result["datetimePrice"]:
-            intraday_data.append({"time": value + 7200, "value": key})
-            result["datetimePrice"].remove(value)
-            break
-
-    data["inraday_data"] = sorted(intraday_data, key=lambda d: d["time"])
-
-    return JsonResponse(data, status=201)
+    # intraday images
+    dax_intraday = generate_intraday_image(14097793)
+    vdax_intraday = generate_intraday_image(12105789)
+    djia_intraday = generate_intraday_image(13320013)
+    
+    return render(request, "data/start.html", {"cheats": cheats, "dax_intraday": dax_intraday, "vdax_intraday": vdax_intraday, "djia_intraday": djia_intraday})
 
 
 @login_required()

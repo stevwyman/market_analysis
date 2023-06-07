@@ -1,5 +1,16 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from io import BytesIO
+
+from django.core.exceptions import ObjectDoesNotExist
+from data.history_dao import History_DAO_Factory
+from .models import (DataProvider)
+
+import base64
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 def humanize_price(price: dict) -> dict:
@@ -98,3 +109,37 @@ def humanize_fundamentals(
             data[f"Rec <sub>{financial_data['recommendationKey']}</sub>"] = financial_data["recommendationMean"]["raw"]
 
     return data
+
+
+def generate_intraday_image(notation_id) -> str:
+    """
+    <!-- citi dax indication: 14097793 -->
+    <!-- vdax 12105789 
+    """
+    try:
+        onvista_dp = DataProvider.objects.get(name="Onvista")
+    except ObjectDoesNotExist:
+        onvista_dp = DataProvider.objects.create(name="Onvista")
+
+    onvista = History_DAO_Factory().get_online_dao(onvista_dp)
+    # result = onvista.lookupIntraday(14097793)
+    result = onvista.lookupIntraday(notation_id)
+
+    timestamps = [datetime.fromtimestamp(unix_ts) for unix_ts in result["datetimePrice"]]
+    ts = timestamps[0]
+    value = result["price"][0]
+
+    fig, line = plt.subplots(figsize=(4,2))
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+    line.plot(timestamps, result["price"], linewidth=0.5, label="VDAX-NEW")
+    line.spines['top'].set_visible(False)
+    line.spines['right'].set_visible(False)
+
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H"))
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=96)
+    image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8').replace('\n', '')
+    buf.close()
+    return {"image": image_base64, "value": value, "ts":ts}

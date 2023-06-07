@@ -4,7 +4,6 @@ from . import views
 urlpatterns = [
     path("", views.index, name="index"),
     path("start", views.start, name="start"),
-    path("intraday_data/<int:notation_id>", views.intraday_data, name="intraday_data"),
     path("limit_new", views.limit_new, name="limit_new"),
     path("limit_edit/<int:limit_id>", views.limit_edit, name="limit_edit"),
     path("limit_drop/<int:limit_id>", views.limit_drop, name="limit_drop"),

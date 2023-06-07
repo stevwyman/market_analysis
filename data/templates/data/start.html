@@ -3,9 +3,59 @@
 
 {% block body %}
 
-<section class="py-5 text-center container">
-    <h1>Limits</h1>
-</section>
+{% load humanize %}
+
+<div class="album py-5">
+    <div class="container">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
+            <div class="">
+                <table class="table">
+                    <tr>
+                        <td colspan="3">DAX</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3"><img class="img-fluid" src="data:image/png;base64,{{ dax_intraday.image }}" alt="DAX"></td>
+                    </tr>
+                    <tr>
+                        <td>{{ dax_intraday.ts|naturaltime }}</td>
+                        <td>&nbsp;</td>
+                        <td class="text-end">{{ dax_intraday.value|floatformat:2 }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="">
+                <table class="table">
+                    <tr>
+                        <td colspan="3">Dow Jones</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3"><img class="img-fluid" src="data:image/png;base64,{{ djia_intraday.image }}" alt="DAX"></td>
+                    </tr>
+                    <tr>
+                        <td>{{ djia_intraday.ts|naturaltime }}</td>
+                        <td>&nbsp;</td>
+                        <td class="text-end">{{ djia_intraday.value|floatformat:2 }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="">
+                <table class="table">
+                    <tr>
+                        <td colspan="3">VDAX-New</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3"><img class="img-fluid" src="data:image/png;base64,{{ vdax_intraday.image }}" alt="Intraday Chart of the VDAX-NEW"></td>
+                    </tr>
+                    <tr>
+                        <td>{{ vdax_intraday.ts|naturaltime }}</td>
+                        <td>&nbsp;</td>
+                        <td class="text-end">{{ vdax_intraday.value|floatformat:2 }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="album py-5 bg-light">
     <div class="container">
@@ -44,7 +94,7 @@
                         </tr>
                         {% endfor %}
                         <tr>
-                            <td colspan="4" class="text-center fw-light">{% load humanize %}{{ entry.ts|naturaltime }}</td>
+                            <td colspan="4" class="text-center fw-light">{{ entry.ts|naturaltime }}</td>
                         </tr>
                     </table>
                     
@@ -54,21 +104,6 @@
         </div>
     </div>
 </div>
-
-<div class="container">
-
-	<div class="row py-1">
-		<div class="col col-md-8">
-
-            <div id="chartContainer">
-                <script>
-                    show_vdax_intraday(12105789)
-                </script>
-            </div>
-        </div>
-    </div>
-</div>
-
 
 {% endblock %}
 
