@@ -4,6 +4,7 @@ import tabulate
 import time
 import urllib3
 
+from typing import Optional
 from bs4 import BeautifulSoup
 from lxml import etree
 from datetime import date, datetime, timedelta
@@ -106,25 +107,25 @@ class LocaleDAO:
         except KeyError:
             pass
 
-    def read_all_by_expiry_date(self, parameter: dict) -> list[dict]:
+    def read_all_by_expiry_date(self, parameter: dict) -> Optional[list[dict]]:
         logger.debug(f"Using Parameter: {parameter}")
         try:
             return list(self._collection.find(generate_filter_expiry_date(parameter)))
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not read data from locale storage: ", e)
-            return list()
+            return None
         except KeyError as ke:
-            return list()
+            return None
 
-    def read_entry(self, parameter: dict) -> dict:
-        logger.debug(f"Using Parameter: {parameter}")
+    def read_entry(self, parameter: dict) -> Optional[dict]:
+        # logger.debug(f"Using Parameter: {parameter}")
         try:
             return self._collection.find_one(generate_unique_filter(parameter))
         except pymongo.errors.ServerSelectionTimeoutError as e:
             logger.error("Could not read data from locale storage: ", e)
-            return {}
+            return None
         except KeyError:
-            return {}
+            return None
 
     def close(self):
         self._client.close
@@ -317,28 +318,32 @@ def get_most_recent_distribution(parameter: dict) -> dict:
     parameter["bus_date"] = bus_date
     put = locale_dao.read_entry(parameter)
 
-    for strike in strikes:
-        data = call["data"]
-        wert = 0
-        for key, value in data.items():
-            if value[0] < strike:
-                delta = strike - value[0]
-                wert += delta * value[1]
+    if call is not None and put is not None:
+        for strike in strikes:
+            data = call["data"]
+            wert = 0
+            for key, value in data.items():
+                if value[0] < strike:
+                    delta = strike - value[0]
+                    wert += delta * value[1]
 
-        if strike not in max_pain:
-            max_pain[strike] = 0
-        max_pain[strike] += wert
+            if strike not in max_pain:
+                max_pain[strike] = 0
+            max_pain[strike] += wert
 
-        data = put["data"]
-        wert = 0
-        for key, value in data.items():
-            if value[0] > strike:
-                delta = value[0] - strike
-                wert += delta * value[1]
+            data = put["data"]
+            wert = 0
+            for key, value in data.items():
+                if value[0] > strike:
+                    delta = value[0] - strike
+                    wert += delta * value[1]
 
-        if strike not in max_pain:
-            max_pain[strike] = 0
-        max_pain[strike] += wert
+            if strike not in max_pain:
+                max_pain[strike] = 0
+            max_pain[strike] += wert
+    else:
+        logger.warn("no puts or calls found")
+        return dict()
 
     locale_dao.close
 
@@ -353,7 +358,7 @@ def get_most_recent_distribution(parameter: dict) -> dict:
     return max_pain_filtered
 
 
-def generate_most_distribution(parameter: dict) -> dict:
+def generate_most_distribution(parameter: dict) -> dict[str, list]:
     """
     generate a chart showing for the specified business date the distribution of calls and puts
     """
@@ -365,29 +370,25 @@ def generate_most_distribution(parameter: dict) -> dict:
 
     call_labels = list()
     call_values = list()
-    for call in calls["data"].values():
-        call_labels.append(call[0])
-        call_values.append(call[2])
+    if calls is not None:
+        for call in calls["data"].values():
+            call_labels.append(call[0])
+            call_values.append(call[2])
 
     parameter["type"] = "Put"
     puts = local_dao.read_entry(parameter)
 
     put_labels = list()
     put_values = list()
-    for put in puts["data"].values():
-        put_labels.append(put[0])
-        put_values.append(put[2])
+    if puts is not None:
+        for put in puts["data"].values():
+            put_labels.append(put[0])
+            put_values.append(put[2])
 
-    data = {}
-    data["call_labels"] = call_labels
-    data["call_values"] = call_values
-    data["put_labels"] = put_labels
-    data["put_values"] = put_values
-
-    return data
+    return {"call_labels": call_labels, "call_values": call_values, "put_labels": put_labels, "put_values": put_values}
 
 
-def generate_unique_filter(parameter: dict) -> dict:
+def generate_unique_filter(parameter: dict) -> dict[str, list]:
     try:
         return {
             "$and": [
@@ -408,7 +409,7 @@ def generate_unique_filter(parameter: dict) -> dict:
         raise KeyError(ke)
 
 
-def generate_filter_expiry_date(parameter: dict) -> dict:
+def generate_filter_expiry_date(parameter: dict) -> dict[str, list]:
     try:
         return {
             "$and": [
@@ -430,14 +431,15 @@ def generate_filter_expiry_date(parameter: dict) -> dict:
 
 def generate_url(
     product: dict[str, int], type: str, expiry_date: dict[str, int], bus_date: str
-):
+) -> str:
     return f"https://www.eurex.com/ex-en/data/statistics/market-statistics-online/100!onlineStats?productGroupId={product['productGroupId']}&productId={product['productId']}&viewType=3&cp={type}&month={expiry_date['month']}&year={expiry_date['year']}&busDate={bus_date}"
 
 
-def next_expiry_date() -> dict:
+def next_expiry_date() -> dict[str, str|int]:
     """
     using the current date, we want to know the next expiry date
     """
+
     now = date.today()
     current_year = now.year
     current_month = now.month
@@ -457,10 +459,5 @@ def next_expiry_date() -> dict:
     expiry_month = expiry_date.month
     expiry_year = expiry_date.year
     expiry_day = datetime.strftime(expiry_date, DATE_FORMAT)
-    expiry_date_entry = {
-        "month": expiry_month,
-        "year": expiry_year,
-        "date": expiry_day,
-    }
 
-    return expiry_date_entry
+    return {"month": expiry_month, "year": expiry_year, "date": expiry_day}

@@ -5,7 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 
@@ -45,10 +45,7 @@ from .models import (
 from .forms import WatchlistForm, SecurityForm, LimitForm
 from .helper import humanize_price, humanize_fundamentals, generate_intraday_image
 
-from typing import Union, List, Dict
-
-ChartingData = Union[Dict[str, str], Dict[str, List[str]]]
-
+from typing import List, Dict
 
 # Create your views here.
 
