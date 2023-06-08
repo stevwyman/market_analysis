@@ -125,9 +125,16 @@ def generate_intraday_image(notation_id) -> str:
     # result = onvista.lookupIntraday(14097793)
     result = onvista.lookupIntraday(notation_id)
 
+    # convert unix timestamps to datetime
     timestamps = [datetime.fromtimestamp(unix_ts) for unix_ts in result["datetimePrice"]]
-    ts = timestamps[0]
-    value = result["price"][0]
+    
+    # get the current values, hence the first one
+    if timestamps:
+        ts = timestamps[0]
+        value = result["price"][0]
+    else:
+        ts = datetime.now
+        value = "NaN"
 
     fig, line = plt.subplots(figsize=(4,2))
     fig.tight_layout()  # otherwise the right y-label is slightly clipped
@@ -139,7 +146,7 @@ def generate_intraday_image(notation_id) -> str:
     plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%H"))
 
     buf = BytesIO()
-    plt.savefig(buf, format='png', dpi=96)
+    plt.savefig(buf, format='png', dpi=96, bbox_inches='tight')
     image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8').replace('\n', '')
     buf.close()
     return {"image": image_base64, "value": value, "ts":ts}

@@ -163,7 +163,7 @@ def update_data(parameter: dict) -> None:
             locale_dao.write(online_data)
             time.sleep(5)
         else:
-            logger.warn(
+            logger.debug(
                 f"Entry already in local storage: {parameter['type']}, {parameter['bus_date']}"
             )
 

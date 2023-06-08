@@ -6,3 +6,30 @@
 .navbar-light .navbar-nav .nav-link:hover {
   color: lightgray !important;
 }
+
+.bg-primary {
+  background-color: #0378A6 !important;
+}
+
+.nav-link {
+  color: #0378A6 !important;
+}
+
+.btn {
+  border-color: #049DBF !important;
+  color: #049DBF ;
+}
+
+.btn:hover, .btn:focus, .btn:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary {
+  color: #fff;
+  background-color: #0378A6;
+  border-color: #049DBF; 
+}
+
+body {
+  font: 'Roboto', sans-serif; 
+  color: #0378A6;
+  -webkit-font-smoothing: antialiased;
+}
+
+

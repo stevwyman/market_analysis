@@ -198,7 +198,7 @@ function generate_chart(data){
 				type: 'solid',
 				color: '#ffffff',
 			},
-			textColor: 'rgba(47, 79, 79, 0.9)',
+			textColor: 'rgba(3, 103, 166, 0.9)',
 		},
 		grid: {
 			vertLines: {
@@ -223,14 +223,14 @@ function generate_chart(data){
 			fontSize: 32,
 			horzAlign: 'center',
 			vertAlign: 'center',
-			color: 'rgba(171, 71, 188, 0.3)',
+			color: 'rgba(4, 157, 191, 0.3)',
 			text: 'wyca-analytics.com',
 		},
 		
 	});
 	
 	var ema50 = chart.addLineSeries({
-		color: 'rgba(4, 111, 232, 1)',
+		color: '#049DBF',
 		lineWidth: 2,
 		priceLineVisible: false
 	});
@@ -238,7 +238,7 @@ function generate_chart(data){
 	ema50.setData(ema50values);
 	
 	var ema20 = chart.addLineSeries({
-		color: 'rgba(4, 111, 232, 1)',
+		color: '#049DBF',
 		lineWidth: 1,
 		priceLineVisible: false
 	});
@@ -345,7 +345,7 @@ function generate_tp_chart(data){
             type: 'solid',
             color: '#ffffff',
         },
-		textColor: 'rgba(47, 79, 79, 0.9)',
+		textColor: 'rgba(3, 103, 166, 0.9)',
 	},
 	grid: {
 		vertLines: {
@@ -370,14 +370,14 @@ function generate_tp_chart(data){
 		fontSize: 32,
 		horzAlign: 'center',
 		vertAlign: 'center',
-		color: 'rgba(171, 71, 188, 0.3)',
+		color: 'rgba(4, 157, 191, 0.3)',
 		text: 'wyca-analytics.com',
 	},
 	*/
     });
 
     var ema50 = chart.addLineSeries({
-        color: 'rgba(4, 111, 232, 1)',
+        color: '#049DBF',
         lineWidth: 2,
     });
     ema50.setData(data.tp_data);
@@ -457,7 +457,7 @@ function generate_max_pain_chart(data){
 				type: 'solid',
 				color: 'white',
 			},
-			textColor: 'rgba(47, 79, 79, 0.9)',
+			textColor: 'rgba(3, 103, 166, 0.9)',
 		},
 		grid: {
 			vertLines: {
@@ -476,22 +476,21 @@ function generate_max_pain_chart(data){
 		timeScale: {
 			borderColor: 'rgba(197, 203, 206, 0.8)',
 		},
-		/*
 		watermark: {
 			visible: true,
 			fontSize: 32,
 			horzAlign: 'center',
 			vertAlign: 'center',
-			color: 'rgba(171, 71, 188, 0.3)',
+			color: 'rgba(4, 157, 191, 0.3)',
 			text: 'wyca-analytics.com',
 		},
-		*/
+		
 	}
 
 	const chart = LightweightCharts.createChart(document.getElementById("chartContainer"), chartOptions);
 	
 	const series = chart.addLineSeries({
-		color: '#2962FF',
+		color: '#0378A6',
 		lineWidth: 2,
 		// disabling built-in price lines
 		lastValueVisible: false,
@@ -556,7 +555,7 @@ function generate_corp_bonds_chart(data){
 				type: 'solid',
 				color: '#ffffff',
 			},
-			textColor: 'rgba(47, 79, 79, 0.9)',
+			textColor: 'rgba(3, 103, 166, 0.9)',
 		},
 		grid: {
 			vertLines: {
@@ -581,14 +580,14 @@ function generate_corp_bonds_chart(data){
 			fontSize: 32,
 			horzAlign: 'center',
 			vertAlign: 'center',
-			color: 'rgba(171, 71, 188, 0.3)',
+			color: 'rgba(4, 157, 191, 0.3)',
 			text: 'wyca-analytics.com',
 		},
 		
 	});
 
 	var ad_line = chart.addLineSeries({
-		color: 'rgba(4, 111, 232, 1)',
+		color: '#049DBF',
 		lineWidth: 2,
 		priceLineVisible: false
 	});
@@ -596,7 +595,7 @@ function generate_corp_bonds_chart(data){
 	
 	var ema_line = chart.addLineSeries({
 		color: '#F2A057',
-		lineWidth: 1,
+		lineWidth: 2,
 		priceLineVisible: false
 	});
 	ema_line.setData(data.trend);

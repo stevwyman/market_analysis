@@ -8,7 +8,7 @@
 <div class="album py-5">
     <div class="container">
         <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3">
-            <div class="">
+            <div class="fw-light">
                 <table class="table">
                     <tr>
                         <td colspan="3">DAX</td>
@@ -23,7 +23,7 @@
                     </tr>
                 </table>
             </div>
-            <div class="">
+            <div class="fw-light">
                 <table class="table">
                     <tr>
                         <td colspan="3">Dow Jones</td>
@@ -38,7 +38,7 @@
                     </tr>
                 </table>
             </div>
-            <div class="">
+            <div class="fw-light">
                 <table class="table">
                     <tr>
                         <td colspan="3">VDAX-New</td>
@@ -63,9 +63,9 @@
             {% for entry in cheats %}
             <div class="col">
                 <div class="card shadow-sm">
-                    <table class="table fw-lighter"">
+                    <table class="table fw-light"">
                         <tr>
-                            <td colspan="3" class="fw-light">{{ entry.security.name }}</td>
+                            <td colspan="3">{{ entry.security.name }}</td>
                             <td><a href="{% url 'limit_new' %}?security_id={{entry.security.id}}" class="btn btn-outline-warning btn-sm" style="--bs-btn-padding-y: .05rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">+</a></td>
                         </tr>
 
@@ -94,7 +94,7 @@
                         </tr>
                         {% endfor %}
                         <tr>
-                            <td colspan="4" class="text-center fw-light">{{ entry.ts|naturaltime }}</td>
+                            <td colspan="4" class="text-center">{{ entry.ts|naturaltime }}</td>
                         </tr>
                     </table>
                     
