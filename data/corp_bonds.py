@@ -145,12 +145,12 @@ class OnlineReader:
         url += "&_=" + str(milliseconds)
 
         response = self._http.request("GET", url, headers={"Cookie": self.__cookie__})
+
         logger.debug(f"Response for {response.geturl()}: {response.status} ... ")
         # print(response.data)
 
         finra_html = response.data.decode("utf-8")
         parsed_html = BeautifulSoup(finra_html, features="lxml")
-        # print(parsed_html)
 
         if parsed_html.body == None:
             raise RuntimeError("invalid response received - empty dataset")
@@ -244,20 +244,20 @@ class LocaleDAO:
         self._client.close
 
 
-def update() -> None:
+def update() -> int:
     """
     checks the latest entry in the local data storage and then updates all missing data until today
     """
     local_dao = LocaleDAO()
     most_recent_date = local_dao.most_recent()
     today = datetime.now()
-    update_range(
+    return update_range(
         datetime.strftime(most_recent_date, FINRA_DATE_FORMAT),
         datetime.strftime(today, FINRA_DATE_FORMAT),
     )
 
 
-def update_range(from_date: str, to_date: str) -> None:
+def update_range(from_date: str, to_date: str) -> int:
     """
     updates the data storage with the entries specified by parameters
     parameters need to come in the following format: "mm/dd/yyyy" the finra data format
@@ -273,6 +273,7 @@ def update_range(from_date: str, to_date: str) -> None:
     online_dao: OnlineReader = OnlineReader()
 
     logger.info(f"collecting from {from_date} to {to_date}")
+    update_count = 0
 
     while d <= end:
         if d.weekday() not in weekend:
@@ -285,11 +286,14 @@ def update_range(from_date: str, to_date: str) -> None:
                 try:
                     online_data = online_dao.request_data(d)
                     if d.strftime("%Y%m%d") == str(online_data["date"]):
+                        update_count += 1
                         local_dao.write(online_data)
                 except RuntimeError as rt:
                     logger.warn(f"Could not get data for {d}: {rt}")
                 time.sleep(4)
         d += delta
+    
+    return update_count
 
 
 def read_bonds_data(type: str, ad_ema=39) -> dict:
@@ -309,8 +313,8 @@ def read_bonds_data(type: str, ad_ema=39) -> dict:
         date = datetime.strptime(str(ad_data["date"]), LOCAL_DATE_FORMAT)
 
         current_ad = adv - dec + previous_ad
-        ad_line.append({"time": str(date), "value": current_ad})
-
+        ad_line.append({"time": str(date), "date": date, "value": current_ad})
+        
         trend_value = trend.add(current_ad)
         if trend_value is not None:
             trend_line.append({"time": str(date), "value": trend_value})

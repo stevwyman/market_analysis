@@ -137,16 +137,18 @@ function show_fa(security_id){
     })
     .then((response) => {
 
+		if (document.querySelector("#fa_link") != null){
+			document.querySelector("#fa_link").classList.add("active")
+		}
+		document.querySelector("#ta_link").classList.remove("active")
+
+		div = document.querySelector("#a_data")
+		div.innerHTML = ""
+
         if (response.ok){
+
             response.json().then( data => {
 				
-				if (document.querySelector("#fa_link") != null){
-					document.querySelector("#fa_link").classList.add("active")
-				}
-				document.querySelector("#ta_link").classList.remove("active")
-
-				div = document.querySelector("#a_data")
-				div.innerHTML = ""
 				table = document.createElement("table")
 				table.classList.add("table", "table-responsive", "table-hover")
 				tbody = document.createElement("tbody")
@@ -171,9 +173,12 @@ function show_fa(security_id){
 				div.append(table)
 
             })
+
         } else {
           response.json().then((data) => {
-              alert(data.error)
+              //alert(data.error)
+			  div.innerHTML = data.error
+
           });
           
         }

@@ -1,35 +1,75 @@
+
+:root {
+  --blue: #1e90ff;
+  --white: #fff;
+
+  --dark-blue: #0367a6;
+  --dark-blue-rgb: 3,103,166;
+  --basic-blue: #0378a6;
+  --light-blue: #049DBF;
+  --amber-full: #F2A057;
+  --amber-light: #F2CEAE;
+
+  --bs-primary: var(--dark-blue) ;
+  --bs-primary-rgb: var(--dark-blue-rgb) ;
+  --bs-link-color: var(--dark-blue) ;
+
+  --bs-body-color: var(--dark-blue) ;
+
+  --bs-table-color: var(--dark-blue);
+}
+
 .navbar-light .navbar-nav .nav-link {
-    color: whitesmoke !important;
+  color: whitesmoke !important;
 }
 
 .navbar-light .navbar-nav .nav-link:focus,
 .navbar-light .navbar-nav .nav-link:hover {
-  color: lightgray !important;
+color: lightgray !important;
 }
 
-.bg-primary {
-  background-color: #0378A6 !important;
+.btn-primary {
+
+  --bs-btn-bg: var(--basic-blue) !important;
+  --bs-btn-border-color: var(--basic-blue);
+  --bs-btn-hover-bg: var(--dark-blue);
+  --bs-btn-hover-border-color: var(--dark-blue);
+
+  --bs-btn-active-bg: var(--dark-blue);
+  --bs-btn-active-border-color: var(--dark-blue);
+
+  --bs-btn-disabled-bg: var(--basic-blue);
+  --bs-btn-disabled-border-color: var(--basic-blue);
 }
 
-.nav-link {
-  color: #0378A6 !important;
+.btn-outline-primary {
+  --bs-btn-color: var(--dark-blue);
+  --bs-btn-border-color: var(--dark-blue);
+  --bs-btn-hover-bg: var(--dark-blue);
+  --bs-btn-hover-border-color: var(--dark-blue);
+  --bs-btn-active-bg: var(--dark-blue);
+  --bs-btn-active-border-color: var(--dark-blue);
+  --bs-btn-disabled-color: var(--dark-blue);
+  --bs-btn-disabled-border-color: var(--dark-blue);
+  }
+
+.btn-outline-warning {
+  --bs-btn-color: var(--amber-full);
+  --bs-btn-border-color: var(--amber-full);
+  --bs-btn-hover-bg: var(--amber-full);
+  --bs-btn-hover-border-color: var(--amber-full);
+  --bs-btn-active-bg: var(--amber-full);
+  --bs-btn-active-border-color: var(--amber-full);
+  --bs-btn-disabled-color: var(--amber-full);
+  --bs-btn-disabled-border-color: var(--amber-full);
 }
 
-.btn {
-  border-color: #049DBF !important;
-  color: #049DBF ;
+.active>.page-link, .page-link.active {
+  background-color: var(--basic-blue);
+  border-color: var(--dark-blue);
 }
 
-.btn:hover, .btn:focus, .btn:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary {
-  color: #fff;
-  background-color: #0378A6;
-  border-color: #049DBF; 
+.page-link:hover {
+  color: var(--white);
+  background-color: var(--light-blue);
 }
-
-body {
-  font: 'Roboto', sans-serif; 
-  color: #0378A6;
-  -webkit-font-smoothing: antialiased;
-}
-
-

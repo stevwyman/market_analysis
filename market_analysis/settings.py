@@ -34,6 +34,7 @@ CSRF_TRUSTED_ORIGINS = ["https://stevwyman.com"]
 
 INSTALLED_APPS = [
     "data",
+    "cachalot",
     "django_bootstrap5",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -41,7 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'django.contrib.humanize'
+    "django.contrib.humanize"
 ]
 
 MIDDLEWARE = [
@@ -87,8 +88,15 @@ DATABASES = {
     }
 }
 
-AUTH_USER_MODEL = 'data.User'
+AUTH_USER_MODEL = "data.User"
 LOGIN_URL = "login"
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake"
+    }
+}
 
 
 # Password validation

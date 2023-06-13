@@ -1,6 +1,7 @@
 beautifulsoup4
 django
 django-bootstrap5
+django-cachalot
 lxml
 matplotlib
 numpy

@@ -148,5 +148,9 @@ def generate_intraday_image(notation_id) -> str:
     buf = BytesIO()
     plt.savefig(buf, format='png', dpi=96, bbox_inches='tight')
     image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8').replace('\n', '')
+    
+    # memory management
     buf.close()
+    plt.close()
+
     return {"image": image_base64, "value": value, "ts":ts}

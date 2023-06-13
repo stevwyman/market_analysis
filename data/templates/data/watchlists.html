@@ -10,8 +10,8 @@
         {% for watchlist in watchlists %}
         <tr>
             <td><a href="{% url 'watchlist' watchlist.id %}">{{ watchlist.name }}</a></td>
-            <td><a href="{% url 'watchlist_edit' watchlist.id %}">edit</a></td>
-            <td><a href="{% url 'watchlist_drop' watchlist.id %}">drop</a></td>
+            <td><a class="btn btn-sm btn-outline-primary" href="{% url 'watchlist_edit' watchlist.id %}">edit</a></td>
+            <td><a class="btn btn-sm btn-outline-warning" href="{% url 'watchlist_drop' watchlist.id %}">drop</a></td>
         </tr>
         {% endfor %}
     </table>

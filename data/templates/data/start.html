@@ -66,7 +66,7 @@
                     <table class="table fw-light"">
                         <tr>
                             <td colspan="3">{{ entry.security.name }}</td>
-                            <td><a href="{% url 'limit_new' %}?security_id={{entry.security.id}}" class="btn btn-outline-warning btn-sm" style="--bs-btn-padding-y: .05rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">+</a></td>
+                            <td><a href="{% url 'limit_new' %}?security_id={{entry.security.id}}" class="btn btn-outline-primary btn-sm" style="--bs-btn-padding-y: .05rem; --bs-btn-padding-x: .5rem; --bs-btn-font-size: .75rem;">+</a></td>
                         </tr>
 
                         {% for item in entry.entries %}

@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
@@ -94,7 +95,7 @@ def start(request):
 
     for security in sec_2_watch:
         logger.debug(f"processing {security}")
-        cheat = {}
+        cheat = dict()
         cheat["security"] = security
         # used for reference and % display
         price = dao.lookupPrice(security.symbol)
@@ -190,10 +191,10 @@ def start(request):
         cheats.append(cheat)
 
     # intraday images
-    dax_intraday = generate_intraday_image(14097793)
-    vdax_intraday = generate_intraday_image(12105789)
-    djia_intraday = generate_intraday_image(13320013)
-    
+    dax_intraday = cache.get_or_set("dax_intraday", generate_intraday_image(14097793), 120)
+    vdax_intraday = cache.get_or_set("vdax_intraday", generate_intraday_image(12105789), 120)
+    djia_intraday = cache.get_or_set("djia_intraday", generate_intraday_image(13320013), 120)
+
     return render(request, "data/start.html", {"cheats": cheats, "dax_intraday": dax_intraday, "vdax_intraday": vdax_intraday, "djia_intraday": djia_intraday})
 
 
@@ -355,37 +356,46 @@ def watchlist(request, watchlist_id: int):
     # building watchlist
     watchlist_entries = list()
     for security in securities:
-        watchlist_entry = {}
-        watchlist_entry["security"] = security
-        dao = History_DAO_Factory().get_online_dao(security.data_provider)
-        if security.data_provider.name == "Yahoo":
-            watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
-        else:
-            history = security.daily_data.all()[:2]
+        
+        # try to get the entry from the cache
+        watchlist_entry = cache.get(security.pk)
 
-            price = {}
-            price["change_percent"] = (
-                100 * (history[0].close - history[1].close) / history[1].close
-            )
-            price["price"] = history[0].close
-            price["change"] = history[0].close - history[1].close
+        # if not already in the cache, crete new
+        if watchlist_entry is None:
+            watchlist_entry = dict()
 
-            price["timestamp"] = history[0].date
-            watchlist_entry["price"] = price
-
-        try:
-            watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)[
-                "forwardPE"
-            ]["raw"]
-        except:
-            watchlist_entry["pe_forward"] = "-"
-
-        try:
+            watchlist_entry["security"] = security
+            dao = History_DAO_Factory().get_online_dao(security.data_provider)
             history = security.daily_data.all()[:55]
-            watchlist_entry["sma"] = SMA(50).latest(history)
-        except ValueError as va:
-            messages.warning(request, va)
+            
+            if security.data_provider.name == "Yahoo":
+                watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
+            else:
+                
+                price = dict()
+                price["change_percent"] = (
+                    100 * (history[0].close - history[1].close) / history[1].close
+                )
+                price["price"] = history[0].close
+                price["change"] = history[0].close - history[1].close
 
+                price["timestamp"] = history[0].date
+                watchlist_entry["price"] = price
+
+            try:
+                watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)[
+                    "forwardPE"
+                ]["raw"]
+            except:
+                watchlist_entry["pe_forward"] = float("nan")
+
+            try:
+                watchlist_entry["sma"] = SMA(50).latest(history)
+            except ValueError as va:
+                messages.warning(request, va)
+
+            cache.add(security.pk, watchlist_entry, 300)
+        
         watchlist_entries.append(watchlist_entry)
 
     # sorting
@@ -764,7 +774,7 @@ def technical_parameter(request, security_id) -> JsonResponse:
         data: Dict = dict()
         data["view"] = view
         if view == "sd":
-            daily = sec.daily_data.all()[:200]
+            daily = sec.daily_data.all()[:1000]
 
             hurst_data = list()
             sma50 = SMA(50)
@@ -869,7 +879,7 @@ def fundamental_analysis(request, security_id) -> JsonResponse:
     if sec is None:
         return JsonResponse({"error", "security has not been found"}, status=404)
 
-    if sec.type == "EQUITY":
+    if sec.type == "EQUITY" and sec.data_provider.name == "Yahoo":
         online_dao = History_DAO_Factory().get_online_dao(sec.data_provider)
         data = humanize_fundamentals(
             online_dao.lookup_financial_data(sec),
@@ -1207,16 +1217,30 @@ def corp_bonds(request):
     # using POST for requesting an update of data
     if request.method == "POST":
         logger.info("request to update the bond data")
-        update()
-        messages.info(request, "Data has been updated")
+        try:
+            count = update()
+            messages.info(request, f"{count} entries have been updated")
+        except:
+            messages.warning(request, "Could not update bond data")
         return HttpResponseRedirect(reverse("corp_bonds"))
     else:
-        data = {}
-        data["title"] = bonds["hy"]
-        ad = read_bonds_data(bonds["hy"])
-        data["ad_data"] = ad
 
-        return render(request, "data/corp_bonds.html", data)
+        hy_ad = read_bonds_data(bonds["hy"])["ad"]
+        hy_trend = read_bonds_data(bonds["hy"])["trend"]
+
+        ig_ad = read_bonds_data(bonds["ig"])["ad"]
+        ig_trend = read_bonds_data(bonds["ig"])["trend"]
+
+        data = {
+            "hy_time": hy_ad[-1]["date"], 
+            "hy_value": hy_ad[-1]["value"],
+            "hy_trend": hy_trend[-1]["value"],
+            "ig_time": ig_ad[-1]["time"], 
+            "ig_value": ig_ad[-1]["value"],
+            "ig_trend": ig_trend[-1]["value"]
+            }
+        
+        return render(request, "data/corp_bonds.html", {"data":data})
 
 
 @login_required()

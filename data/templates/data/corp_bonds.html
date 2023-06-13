@@ -32,7 +32,42 @@
 		</div>
 		<div class="col col-md-4">
 			<div class="fs-6 fw-light py-2" >
-				here should be the comparison
+				<table class="table">
+					<tr>
+						<th></th>
+						<th>Inv Grade</th>
+						<th>High Yield</th>
+					</tr>
+					<tr>
+						<th>adv-dec</th>
+						{% if data.ig_value > data.ig_trend %}
+						<td class="table-success">
+						{% elif data.ig_value < data.ig_trend %}
+						<td class="table-danger">
+						{% else %}
+						<td class="table-info">
+						{% endif %}    
+							{{ data.ig_value }}
+						</td>
+						{% if data.hy_value > data.hy_trend %}
+						<td class="table-success">
+						{% elif data.hy_value < data.hy_trend %}
+						<td class="table-danger">
+						{% else %}
+						<td class="table-info">
+						{% endif %}    
+							{{ data.hy_value }}
+						</td>
+					</tr>
+					<tr>
+						<th>5% trend</th>
+						<td>{{ data.ig_trend|floatformat:0 }}</td>
+						<td>{{ data.hy_trend|floatformat:0 }}</td>
+					</tr>
+					<tr>
+						<td class="text-center" colspan="3">{{ data.hy_time|date:"M d, Y" }}</td>
+					</tr>
+				</table>
 			</div>
 		</div>
 	</div>

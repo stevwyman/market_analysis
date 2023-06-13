@@ -22,8 +22,8 @@ points to check:
 docker buildx build --platform=linux/amd64 -t market_analysis .
 
 # prepare for deployment
-docker tag market_analysis -/market_analysis
-docker push -/market_analysis
+docker tag market_analysis stevwyman/market_analysis
+docker push stevwyman/market_analysis
 
 # create an internal network for the images
 docker network create analysis_net
