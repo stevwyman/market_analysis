@@ -23,19 +23,19 @@
 			<div class="py-2">
 				<ul class="nav nav-tabs">
 					<li class="nav-item">
-						<a class="nav-link" id="nl_daily" onClick="show_history('{{ security.id }}', 'd')" href="#">Daily</a>
+						<a class="nav-link" id="nl_daily" onClick="return show_history('{{ security.id }}', 'd')" href="#">Daily</a>
 					</li>
 					<li class="nav-item">
-						<a class="nav-link" id="nl_weekly" onClick="show_history('{{ security.id }}', 'w')" href="#">Weekly</a>
+						<a class="nav-link" id="nl_weekly" onClick="return show_history('{{ security.id }}', 'w')" href="#">Weekly</a>
 					</li>
 					<li class="nav-item">
-						<a class="nav-link" id="nl_monthly" onClick="show_history('{{ security.id }}', 'm')" href="#">Monthly</a>
+						<a class="nav-link" id="nl_monthly" onClick="return show_history('{{ security.id }}', 'm')" href="#">Monthly</a>
 					</li>
 					<li class="nav-item">
-						<a class="nav-link" id="nl_hurst" onClick="show_tp('{{ security.id }}', 'hurst')" href="#">Hurst</a>
+						<a class="nav-link" id="nl_hurst" onClick="return show_tp('{{ security.id }}', 'hurst')" href="#">Hurst</a>
 					</li>
 					<li class="nav-item">
-						<a class="nav-link" id="nl_sd" onClick="show_tp('{{ security.id }}', 'sd')" href="#">SD</a>
+						<a class="nav-link" id="nl_sd" onClick="return show_tp('{{ security.id }}', 'sd')" href="#">SD</a>
 					</li>
 				</ul>
 			</div>
@@ -50,11 +50,11 @@
 				<ul class="nav nav-tabs">
 					{% if security.type == "EQUITY" %}
 					<li class="nav-item">
-						<a class="nav-link active" id="fa_link" aria-current="page" onClick="show_fa('{{ security.id }}')" href="#">Fundamentals</a>
+						<a class="nav-link active" id="fa_link" aria-current="page" onClick="return show_fa('{{ security.id }}')" href="#">Fundamentals</a>
 					</li>
 					{% endif %}
 					<li class="nav-item">
-					  <a class="nav-link" id="ta_link" onClick="show_ta('{{ security.id }}')" href="#">Technical</a>
+					  <a class="nav-link" id="ta_link" onClick="return show_ta('{{ security.id }}')" href="#">Technical</a>
 					</li>
 				  </ul>
 			</div>

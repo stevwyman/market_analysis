@@ -37,6 +37,8 @@ function show_history(security_id, parameter){
     .catch( error => {
         console.log('Error:', error);
     })
+
+	return false
 }
 
 
@@ -67,6 +69,8 @@ function show_tp(security_id, parameter){
     .catch( error => {
         console.log('Error:', error);
     })
+
+	return false
 }
 
 
@@ -125,6 +129,8 @@ function show_ta(security_id){
     .catch( error => {
         console.log('Error:', error);
     })
+
+	return false
 }
 
 
@@ -186,6 +192,8 @@ function show_fa(security_id){
     .catch( error => {
         console.log('Error:', error);
     })
+
+	return false
 }
 
 
@@ -449,6 +457,8 @@ function show_max_pain(underlying){
     .catch( error => {
         console.log('Error:', error);
     })
+
+	return false
 }
 
 
