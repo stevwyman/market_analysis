@@ -14,30 +14,40 @@
                     <th scope="col" class="d-table-cell d-sm-none">Symbol</th>
                     <th scope="col" class="d-none d-sm-table-cell">Name</th>
                     <th scope="col" class="d-none d-sm-table-cell">latest</th>
-                    <th scope="col">
+                    <th colspan="2" scope="col">
                         change
                         {% if watchlist is not None %}
-                        <br>(<a href="?order_by=change&direction=desc">&darr;</a><a href="?order_by=change&direction=asc">&uarr;</a>)</th>
+                        <br><small><a href="?order_by=change&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=change&direction=asc" class="no-underline">&uarr;</a></small>
                         {% endif %}
+                    </th>
                     <th scope="col">
                         PE<sub>forward</sub>
                         {% if watchlist is not None %}
-                        <br>(<a href="?order_by=pef&direction=desc">&darr;</a><a href="?order_by=pef&direction=asc">&uarr;</a>)</th>
-                        {% endif %}
-                    <th scope="col" class="d-none d-sm-table-cell">
-                        δ<sub>SMA(50)</sub>
-                        {% if watchlist is not None %}
-                        <br>(<a href="?order_by=delta&direction=desc">&darr;</a><a href="?order_by=delta&direction=asc">&uarr;</a>)</th>
+                        <br><small><a href="?order_by=pef&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=pef&direction=asc" class="no-underline">&uarr;</a></small>
                         {% endif %}
                     </th>
-                    <th scope="col">spread
+                    <th scope="col" class="d-none d-sm-table-cell">
+                        &delta;
                         {% if watchlist is not None %}
-                        <br>(<a href="?order_by=spread&direction=desc">&darr;</a><a href="?order_by=spread&direction=asc">&uarr;</a>)</th>
+                        <br><small><a href="?order_by=delta&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=delta&direction=asc" class="no-underline">&uarr;</a></small>
                         {% endif %}
-                    <th scope="col">Hurst
+                    </th>
+                    <th scope="col">&sigma;
                         {% if watchlist is not None %}
-                        <br>(<a href="?order_by=hurst&direction=desc">&darr;</a><a href="?order_by=hurst&direction=asc">&uarr;</a>)</th>
+                        <br><small><a href="?order_by=spread&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=spread&direction=asc" class="no-underline">&uarr;</a></small>
                         {% endif %}
+                    </th>
+                    <th scope="col">h
+                        {% if watchlist is not None %}
+                        <br><small><a href="?order_by=hurst&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=hurst&direction=asc" class="no-underline">&uarr;</a></small>
+                        {% endif %}
+                    </th>
+                    <th>
+                        &#9729;
+                        {% if watchlist is not None %}
+                        <br><small><a href="?order_by=ikh&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=ikh&direction=asc" class="no-underline">&uarr;</a></small>
+                        {% endif %}
+                    </th>
                     {% if watchlist.user == user %}
                     <th scope="col" class="d-none d-sm-table-cell"></th>
                     {% endif %}
@@ -49,11 +59,26 @@
                     <td class="d-table-cell d-sm-none"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.symbol }}</a></th>
                     <td class="d-none d-sm-table-cell"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.name }}</a></th>
                     <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.price.currency_symbol }}&nbsp;{{ watchlist_entry.price.price|floatformat:2 }}<br><small>{% load humanize %}{{ watchlist_entry.price.local_timestamp|naturaltime }}{{ watchlist_entry.price.timestamp }}</small></td>
-                    <td class="text-end">{{ watchlist_entry.price.change_percent|floatformat:2 }}%<br><small>({{ watchlist_entry.price.change|floatformat:2 }})</small></td>
+                    <!-- change percent br percent-->
+                    {% if watchlist_entry.price.change_percent >= 0 %}
+                    <td class="text-end text-success">
+                    {% else %}
+                    <td class="text-end text-danger">
+                    {% endif %}
+                        {{ watchlist_entry.price.change_percent|floatformat:2 }}%<br><small>({{ watchlist_entry.price.change|floatformat:2 }})</small>
+                    </td>
+                    <!-- up/down arrow -->
+                    {% if watchlist_entry.price.change_percent >= 0 %}
+                    <td class="text-begin align-middle text-success">&#x25B2;
+                    {% else %}
+                    <td class="text-begin align-middle text-danger">&#x25BC;
+                    {% endif %}
+                    </td>
                     <td class="text-end">{{ watchlist_entry.pe_forward|floatformat:1 }}</td>
                     <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.sma.delta|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.sd|floatformat:2 }}</td>
                     <td class="text-end">{{ watchlist_entry.sma.hurst|floatformat:2 }}</td>
+                    <td class="text-end">{{ watchlist_entry.ikh_evaluation }}</td>
                     {% if watchlist.user == user %}
                     <td class="text-end d-none d-sm-table-cell">
                         <form action="{% url 'security_drop' watchlist.id %}" method="post">

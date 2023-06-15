@@ -73,3 +73,7 @@ color: lightgray !important;
   color: var(--white);
   background-color: var(--light-blue);
 }
+
+a.no-underline {
+  text-decoration: none;
+}

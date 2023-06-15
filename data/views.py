@@ -11,7 +11,7 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from datetime import datetime, date
-from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI
+from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI, Ichimoku, evaluate_ikh
 from data.ai_helper import generate
 from zoneinfo import ZoneInfo
 
@@ -366,7 +366,7 @@ def watchlist(request, watchlist_id: int):
 
             watchlist_entry["security"] = security
             dao = History_DAO_Factory().get_online_dao(security.data_provider)
-            history = security.daily_data.all()[:55]
+            history = security.daily_data.all()[:200]
             
             if security.data_provider.name == "Yahoo":
                 watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
@@ -390,7 +390,21 @@ def watchlist(request, watchlist_id: int):
                 watchlist_entry["pe_forward"] = float("nan")
 
             try:
-                watchlist_entry["sma"] = SMA(50).latest(history)
+                ikh = Ichimoku()
+                sma = SMA(50)
+                for h in reversed(history):
+                    close = float(h.close)
+                    ikh_entry = ikh.add(high=float(h.high_price), low=float(h.low), close=close)
+                    sma_entry = sma.add(close)
+                    sd_entry = sma.sigma_delta()
+                    hurst_entry = sma.hurst()
+                    
+                watchlist_entry["ikh_evaluation"] = evaluate_ikh(close, ikh_entry)
+                watchlist_entry["sma"] = {
+                    "hurst": hurst_entry, 
+                    "sd": sd_entry,
+                    "delta": 100 * (close - sma_entry) / sma_entry
+                    }              
             except ValueError as va:
                 messages.warning(request, va)
 
@@ -420,6 +434,8 @@ def watchlist(request, watchlist_id: int):
         watchlist_entries.sort(key=lambda x: x["pe_forward"], reverse=_b_direction)
     elif order_by == "delta":
         watchlist_entries.sort(key=lambda x: x["sma"]["delta"], reverse=_b_direction)
+    elif order_by == "ikh":
+        watchlist_entries.sort(key=lambda x: x["ikh_evaluation"], reverse=_b_direction)
 
     # pagination
     paginator = Paginator(watchlist_entries, 6)
@@ -799,6 +815,20 @@ def technical_parameter(request, security_id) -> JsonResponse:
                     hurst_data.append({"time": str(entry.date), "value": hurst_value})
 
             data["tp_data"] = hurst_data
+        elif view == "ikh":
+            daily = sec.daily_data.all()[:400]
+
+            ikh_data = list()
+            ichimoku = Ichimoku()
+
+            for entry in reversed(daily):
+                ichimoku_entry = ichimoku.add(high=float(entry.open),
+                             low=float(entry.low),
+                              close=float(entry.close) )
+                
+                if ichimoku_entry is not None:
+                    ikh_data.append({"time":str(entry.date), "ikh": ichimoku_entry})
+                data["tp_data"] = ikh_data
 
         logger.debug(data)
 
@@ -809,7 +839,6 @@ def technical_parameter(request, security_id) -> JsonResponse:
 def tech_analysis(request, security_id) -> JsonResponse:
     """
     generates a dictionary holding the current values for the different technical analysis parameter
-    TODO: RSI, MACD
     """
 
     sec = Security.objects.get(pk=security_id)

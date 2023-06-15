@@ -68,6 +68,21 @@ class SMA(MovingAverage):
         self.__sma = mean(self._queue)
 
         return self.__sma
+    
+    def getN(self) -> int:
+        return len(self._queue)
+    
+    def getMax(self) -> float:
+        return max(self._queue)
+    
+    def getMin(self) -> float:
+        return min(self._queue)
+    
+    def getFirst(self) -> float:
+        return self._queue[0]
+    
+    def getLast(self) -> float:
+        return self._queue[-1]
 
     def sigma_delta(self) -> Optional[float]:
         if len(self._queue) == self._length:
@@ -91,7 +106,7 @@ class SMA(MovingAverage):
 
     def latest(self, history: QuerySet[HistoricData]) -> dict:
         if history.count() > self._length:
-            data = {}
+            data = dict()
             r_history = list()
             for entry in reversed(history):
                 close = float(entry.close)
@@ -208,6 +223,134 @@ class Momentum:
         else:
             return None
         
+
+class Ichimoku:
+
+    def __init__(self, 
+                 kijun_lookback  = 26, 
+                 tenkan_lookback =  9, 
+                 chikou_lookback = 26, 
+                 senkou_span_b_lookback = 52):
+        
+        self.__tenkan_length = tenkan_lookback
+        self.__kijun_length = kijun_lookback
+        self.__senko_span_length = senkou_span_b_lookback
+        
+        self.tenkan_sen_highs = SMA(self.__tenkan_length)
+        self.tenkan_sen_lows = SMA(self.__tenkan_length)
+
+        self.kijun_sen_highs = SMA(self.__kijun_length)
+        self.kijun_sen_lows = SMA(self.__kijun_length)
+
+        self.chikous = SMA(chikou_lookback)
+        self.chikous_span_1s = SMA(chikou_lookback)
+        self.chikous_span_2s = SMA(chikou_lookback)
+
+        self.senko_span_highs = SMA(self.__senko_span_length)
+        self.senko_span_lows = SMA(self.__senko_span_length)
+
+        self.senko_a_history = list()
+        self.senko_b_history = list()
+
+    def add(self, high, low, close) -> Optional[dict]:
+        """
+        returns the current ichimoku values: tenkan, kijun, senkos (cumo), chikou and future senkos, so the furture cloud
+        """
+
+        self.tenkan_sen_highs.add(high)
+        self.kijun_sen_highs.add(high)
+        self.senko_span_highs.add(high)
+
+        self.tenkan_sen_lows.add(low)
+        self.kijun_sen_lows.add(low)
+        self.senko_span_lows.add(low)
+
+        self.chikous.add(close)
+
+        if (self.tenkan_sen_highs.getN() == self.__tenkan_length and self.kijun_sen_highs.getN() == self.__kijun_length):
+            tenkan_sen = (self.tenkan_sen_highs.getMax() + self.tenkan_sen_lows.getMin()) / 2
+            kijun_sen = (self.kijun_sen_highs.getMax() + self.kijun_sen_lows.getMin()) / 2
+
+            senko = (tenkan_sen + kijun_sen) / 2
+            self.senko_a_history.append(senko)
+
+        if self.senko_span_highs.getN() == self.__senko_span_length:
+            senko_span = (self.senko_span_highs.getMax() + self.senko_span_lows.getMin()) / 2
+            self.senko_b_history.append(senko_span)
+
+        if len(self.senko_a_history) > self.__kijun_length + self.__senko_span_length:
+
+            senko_span_1 = self.senko_a_history[-1 - self.__kijun_length]
+            senko_span_2 = self.senko_b_history[-1 - self.__kijun_length]
+
+            self.chikous_span_1s.add(senko_span_1)
+            self.chikous_span_2s.add(senko_span_2)
+
+            return {"tenkan_sen": tenkan_sen,
+                    "kijun_sen": kijun_sen,
+                    # kumo boundaries
+                    "senko_span_1_current": senko_span_1,
+                    "senko_span_2_current": senko_span_2,
+                    # behind
+                    "close_at_chikou": self.chikous.getLast(),
+                    # the kumo at chikou position
+                    "chikou_span_1": self.chikous_span_1s.getLast(),
+                    "chikou_span_2": self.chikous_span_2s.getLast(),
+                    # up front (future kumo)
+                    "senko_span_1_future": self.senko_a_history[-1],
+                    "senko_span_2_future": self.senko_b_history[-1]
+                    }
+        
+    def latest(self, history: QuerySet[HistoricData]) -> dict:
+        if history.count() > self.__senko_span_length:
+            for entry in reversed(history):
+                current_ikh = self.add(float(entry.high_price), float(entry.low), float(entry.close))
+            return {"ikh": current_ikh}
+        else:
+            raise ValueError("History size not sufficient.")
+
+
+def evaluate_ikh(close:float, ikh:dict ) -> int:
+
+    evaluation_value = 0
+
+    # is close above the cloud
+    if close > ikh["senko_span_1_current"] and close > ikh["senko_span_2_current"]:
+         evaluation_value += 1
+    # is the close below the cloud
+    elif close < ikh["senko_span_1_current"] and close < ikh["senko_span_2_current"]:
+         evaluation_value -= 1
+
+    # current cumo(cloud) red or green
+    if ikh["senko_span_1_current"] >= ikh["senko_span_2_current"]:
+        evaluation_value += 1
+    else:
+        evaluation_value -= 1
+
+    # check kijun
+    if close > ikh["kijun_sen"]:
+        evaluation_value += 1
+    else:
+        evaluation_value -= 1
+
+    # check tenkan relative to kijun
+    if ikh["tenkan_sen"] > ikh["kijun_sen"]:
+        evaluation_value += 1
+    else:
+        evaluation_value -= 1
+
+    # check chikou
+    if close > ikh["close_at_chikou"]:
+        evaluation_value += 1
+        if close > ikh["chikou_span_1"] and close > ikh["chikou_span_2"]:
+            evaluation_value += 1
+    elif close < ikh["close_at_chikou"]:
+        evaluation_value -= 1
+        if close < ikh["chikou_span_1"] and close < ikh["chikou_span_2"]:
+            evaluation_value -= 1
+
+    return evaluation_value
+
 
 class Hurst:
     def hurst(self, input_ts, lags_to_test=[2, 20]):

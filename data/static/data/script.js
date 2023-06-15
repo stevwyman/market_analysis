@@ -74,11 +74,15 @@ function show_tp(security_id, parameter){
 }
 
 
+/**
+ * use to generate a table highlighting the technical parameter such as delta from EMA, sigma ...
+ * @param {*} security_id 
+ * @returns 
+ */
 function show_ta(security_id){
 
     fetch("/data/ta/" + security_id, {
         method: "GET",
-        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
         mode: "same-origin"
     })
     .then((response) => {
@@ -133,12 +137,15 @@ function show_ta(security_id){
 	return false
 }
 
-
+/**
+ * use to generate a table with the fundamental parameter
+ * @param {*} security_id 
+ * @returns 
+ */
 function show_fa(security_id){
 
     fetch("/data/fa/" + security_id, {
         method: "GET",
-        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
         mode: "same-origin"
     })
     .then((response) => {
@@ -437,7 +444,6 @@ function generate_tp_chart(data){
 function show_max_pain(underlying){
 	fetch("/data/max_pain/" + underlying, {
         method: "GET",
-        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
         mode: "same-origin"
     })
     .then((response) => {
@@ -530,9 +536,9 @@ function generate_max_pain_distribution(data){
 
 
 function show_corp_bonds(type){
+
 	fetch("/data/corp_bonds_data/" + type, {
         method: "GET",
-        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
         mode: "same-origin"
     })
     .then((response) => {
@@ -552,6 +558,8 @@ function show_corp_bonds(type){
     .catch( error => {
         console.log('Error:', error);
     })
+
+	return false
 }
 
 

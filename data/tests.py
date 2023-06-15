@@ -4,11 +4,21 @@ from django.urls import reverse
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
 from data.history_dao import History_DAO_Factory, Interval
+from data.technical_analysis import SMA
 
 """
 Note, due to limitations on the API keys, we have disabled the Polygon and Tiingo tests
 also OI need to be rewritten so we do not request as many data
 """
+
+class TechnicalAnalysis(TestCase):
+
+    def test_sma(self) -> None:
+        new_list = (1,2,3,4,5)
+        sma = SMA(3)
+        for i in new_list:
+            sma_value = sma.add(i)
+            print(f"min: {sma.getMin()} max: {sma.getMax()}")
 
 class Onvista(TestCase):
     def setUp(self) -> None:

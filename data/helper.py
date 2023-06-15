@@ -4,7 +4,7 @@ from io import BytesIO
 
 from django.core.exceptions import ObjectDoesNotExist
 from data.history_dao import History_DAO_Factory
-from .models import (DataProvider)
+from data.models import DataProvider
 
 import base64
 import matplotlib
@@ -111,7 +111,7 @@ def humanize_fundamentals(
     return data
 
 
-def generate_intraday_image(notation_id) -> str:
+def generate_intraday_image(notation_id) -> dict:
     """
     <!-- citi dax indication: 14097793 -->
     <!-- vdax 12105789 
@@ -154,3 +154,4 @@ def generate_intraday_image(notation_id) -> str:
     plt.close()
 
     return {"image": image_base64, "value": value, "ts":ts}
+
