@@ -225,10 +225,14 @@ def get_max_pain_history(parameter: dict) -> list:
         parameter["type"] = "Call"
         parameter["bus_date"] = bus_date
         call = locale_dao.read_entry(parameter)
+        if call is None:
+            continue
 
         parameter["type"] = "Put"
         parameter["bus_date"] = bus_date
         put = locale_dao.read_entry(parameter)
+        if put is None:
+            continue
 
         for strike in strikes:
             data = call["data"]
@@ -275,6 +279,9 @@ def get_most_recent_distribution(parameter: dict) -> dict:
         get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
     )
 
+    if max_pain_over_time is None or len(max_pain_over_time) == 0:
+        return dict()
+
     current_max_pain = max_pain_over_time[0]
     min_level = current_max_pain[1] * 0.925
     max_level = current_max_pain[1] * 1.075
@@ -308,7 +315,7 @@ def get_most_recent_distribution(parameter: dict) -> dict:
     bus_date = sorted(bus_dates, reverse=True)[0]
 
     # max pain is a dict holding strike - value data, where value is a sum of put and call
-    max_pain = {}
+    max_pain = dict()
 
     parameter["type"] = "Call"
     parameter["bus_date"] = bus_date

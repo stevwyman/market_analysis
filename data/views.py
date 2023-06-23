@@ -44,7 +44,7 @@ from .models import (
     Limit,
 )
 from .forms import WatchlistForm, SecurityForm, LimitForm
-from .helper import humanize_price, humanize_fundamentals, generate_intraday_image
+from .helper import humanize_price, humanize_fundamentals, generate_intraday_image, generate_max_pain_distribution
 
 from typing import List, Dict
 
@@ -1159,6 +1159,10 @@ def open_interest(request, underlying: str):
             reverse("open_interest", kwargs={"underlying": underlying})
         )
 
+
+    ## for testing
+    distribution_image = generate_max_pain_distribution(parameter)
+
     return render(
         request,
         "data/open_interest.html",
@@ -1167,13 +1171,15 @@ def open_interest(request, underlying: str):
             "product": product,
             "latest": most_recent,
             "underlyings": underlyings,
+            #
+            "distribution": distribution_image
         },
     )
 
 
 @login_required()
 @user_passes_test(is_premium, login_url="start")
-def max_pain(request, underlying: str) -> JsonResponse:
+def max_pain_history(request, underlying: str) -> JsonResponse:
     """
     returning a (time:value) dictionary showing the maxpain value by date
     """
@@ -1210,21 +1216,21 @@ def max_pain(request, underlying: str) -> JsonResponse:
 @user_passes_test(is_premium, login_url="start")
 def max_pain_distribution(request, underlying: str) -> JsonResponse:
     """
-    returning a dataset showing the distribution over strikes for a specific day
+    returning an image showing the most recent distribution over strikes 
     """
-    data = {}
+
     if underlying in underlyings.keys():
         product = underlyings[underlying]
+        expiry_date = next_expiry_date()
+        parameter = {"product": product, "expiry_date": expiry_date}
     else:
-        data["error"] = "underlying not found"
-        return JsonResponse(data, status=404)
+        messages.error(request, "Underlying not found")
+        return HttpResponseRedirect(reverse("watchlists"))
 
-    expiry_date = next_expiry_date()
-    parameter = {"product": product, "expiry_date": expiry_date}
+    distribution = generate_max_pain_distribution(parameter)
+    data = {"distribution": distribution}
 
-    distribution = get_most_recent_distribution(parameter)
-
-    return JsonResponse(distribution, status=200)
+    return JsonResponse(data, status=200)
 
 
 #
@@ -1282,6 +1288,111 @@ def corp_bonds_data(request, type: str) -> JsonResponse:
     data = read_bonds_data(bonds[type])
 
     return JsonResponse(data, status=200)
+
+
+#
+# section for sentiment
+#
+sources = {"FRA": "Sentiment at Frankfurt",
+           "AAII": "Private investors in the US",
+           "NAAIM": "Portfolio exposure from professionals in the US",
+           "FRA_SPREAD": "Shows the difference in bull/bear spread for privates and institutionals"}
+
+@login_required
+def sentiment(request):
+
+    try:
+        data_provider = DataProvider.objects.get(name="wyca-analytics")
+    except ObjectDoesNotExist:
+        data_provider = DataProvider.objects.create(name="wyca-analytics")
+
+    sentiment_dao = History_DAO_Factory().get_online_dao(data_provider)
+
+    if request.method == "GET":
+        try:
+            fra = json.loads(sentiment_dao.lookupData("FRA", 2))
+            aaii = json.loads(sentiment_dao.lookupData("AAII", 2))
+            naaim = json.loads(sentiment_dao.lookupData("NAAIM", 2))
+        except:
+            messages.warning(request, "Could not get data from source")
+            return render(request, "data/index.html")
+
+        return render(request, "data/sentiment.html", {"fra": fra, "aaii": aaii, "naaim": naaim})
+
+    elif request.method == "POST":
+
+        data: Dict = dict()
+
+        provided_data = json.loads(request.body)
+        source = provided_data.get("source", "NAAIM")
+        size = provided_data.get("size", 200)
+
+        if source not in sources:
+            data["error"] = "Invalid parameter provided"
+            return JsonResponse(data, status=201)
+        
+        data["source"] = source
+
+        if source == "NAAIM":
+            naaim_data = list()
+            try: 
+                naaim = json.loads(sentiment_dao.lookupData("NAAIM", size))
+                for entry in naaim["exposures"]:
+                    naaim_data.append({"time": entry["date"], "value": entry["mean"]})
+                data["naaim_exposure"] = naaim_data
+            except:
+                data["error"] = "no connection"
+                return JsonResponse(data, status=401)
+        elif source == "AAII":
+            aaii_bulls = list()
+            aaii_bears = list()
+            try:
+                aaii = json.loads(sentiment_dao.lookupData("AAII", size))
+                for entry in aaii["aaii"]:
+                    aaii_bulls.append({"time": entry["date"], "value": entry["bull"]})
+                    aaii_bears.append({"time": entry["date"], "value": entry["bear"]})
+                data["aaii_bulls"] = aaii_bulls
+                data["aaii_bears"] = aaii_bears
+            except:
+                data["error"] = "no connection"
+                return JsonResponse(data, status=401)
+        elif source == "FRA":
+            private_bears = list()
+            institutional_bears = list()
+            try:
+                fra = json.loads(sentiment_dao.lookupData("FRA", size))
+                for entry in fra["institutionals"]:
+                    institutional_bears.append({"time": entry["date"], "value": entry["bears"]})
+                for entry in fra["privates"]:
+                    private_bears.append({"time": entry["date"], "value": entry["bears"]})
+                data["institutional_bears"] = institutional_bears
+                data["private_bears"] = private_bears
+            except:
+                data["error"] = "no connection"
+                return JsonResponse(data, status=401)
+            
+        elif source == "FRA_SPREAD":
+            spread = list()
+            p_basis = dict()
+            i_basis = dict()
+            try:
+                fra = json.loads(sentiment_dao.lookupData("FRA", size))
+                for entry in fra["institutionals"]:
+                    i_basis[entry["date"]] = {"i_value": entry["bulls"] - entry["bears"]}
+                for entry in fra["privates"]:
+                    p_basis[entry["date"]] = {"p_value": entry["bulls"] - entry["bears"]}
+
+                for entry in p_basis:
+                    value = i_basis[entry]["i_value"] - p_basis[entry]["p_value"]
+                    spread.append({"time": entry, "value": value})
+
+                data["fra_spread"] = spread
+            except:
+                data["error"] = "no connection"
+                return JsonResponse(data, status=401)
+
+        return JsonResponse(data, status=201)
+    return JsonResponse(data, status=404)
 
 
 #

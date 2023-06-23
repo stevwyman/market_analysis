@@ -2,6 +2,7 @@ beautifulsoup4
 django
 django-bootstrap5
 django-cachalot
+#django-crontab
 lxml
 matplotlib
 numpy

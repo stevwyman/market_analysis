@@ -1,0 +1,72 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+
+{% load django_bootstrap5 %}
+
+<section class="py-5 text-center container">
+	<h1>Sentiment</h1>
+</section>
+
+{% csrf_token %}
+
+<div class="container">
+
+    <div class="row py-1">
+        <div class="col col-md-8">
+            <div class="py-2">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link" id="naaim" onClick="return show_sentiment('NAAIM')" href="#">NAAIM exposure</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="aaii" onClick="return show_sentiment('AAII')" href="#">AAII</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="fra" onClick="return show_sentiment('FRA')" href="#">FRA</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="fra-spread" onClick="return show_sentiment('FRA_SPREAD')" href="#">FRA spread</a>
+                    </li>
+                </ul>
+            </div>
+            <div id="chartContainer">
+                <script>
+                    show_sentiment('NAAIM')
+                </script>
+            </div>
+        </div>
+        <div class="col col-md-4">
+            <div class="py-2">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="ta_link" href="#">Current</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="fs-6 fw-light py-2" >
+                <h5>NAAIM exposure</h5>
+                <div>{{ naaim.exposures.1.date }}: {{ naaim.exposures.1.mean }} ({{ naaim.exposures.0.mean }})</div>
+                <br>
+                <h5>AAII</h5>
+                <div> {{ aaii.aaii.1.date }}</div>
+                <div>bulls: {{ aaii.aaii.1.bull }} ({{ aaii.aaii.0.bull }})</div>
+                <div>bears: {{ aaii.aaii.1.bear }} ({{ aaii.aaii.0.bear }})</div>
+                <br>
+                <h5>Frankfurt</h5>
+                <div>privates {{ fra.privates.1.date }}</div>
+                <div>bulls: {{ fra.privates.1.bulls }} ({{ fra.privates.0.bulls }})</div>
+                <div>bears: {{ fra.privates.1.bears }} ({{ fra.privates.0.bears }})</div>
+                <br>
+                <div>institutionals {{ fra.institutionals.1.date }}</div>
+                <div>bulls: {{ fra.institutionals.1.bulls }} ({{ fra.institutionals.0.bulls }})</div>
+                <div>bears: {{ fra.institutionals.1.bears }} ({{ fra.institutionals.0.bears }})</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+{% endblock %}

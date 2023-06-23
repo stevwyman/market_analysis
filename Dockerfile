@@ -1,6 +1,8 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
 FROM python:3.11-slim
 
+#RUN apt-get update && apt-get -y install cron
+
 EXPOSE 8001
 
 # Keeps Python from generating .pyc files in the container
@@ -14,6 +16,9 @@ ENV POLYGON_API_KEY=###
 
 # Set the Tiingo API key
 ENV TIINGO_API_KEY=###
+
+# Set the Tiingo API key
+ENV COMWYCA_API_KEY=###
 
 # Set the mongodb host
 ENV MONGODB_HOST=mongo

@@ -27,11 +27,14 @@ urlpatterns = [
     
     path("update_all", views.update_all, name="update_all"),
     path("open_interest/<str:underlying>", views.open_interest, name="open_interest"),
-    path("max_pain/<str:underlying>", views.max_pain, name="max_pain"),
+    path("max_pain_history/<str:underlying>", views.max_pain_history, name="max_pain_history"),
     path("max_pain_distribution/<str:underlying>", views.max_pain_distribution, name="max_pain_distribution"),
 
     path("corp_bonds", views.corp_bonds, name="corp_bonds"),
     path("corp_bonds_data/<str:type>", views.corp_bonds_data, name="corp_bonds_data"),
+
+    # sentiment
+    path("sentiment", views.sentiment, name="sentiment"),
 
     # build_data_set
     path("bds", views.build_data_set, name="build_data_set"),

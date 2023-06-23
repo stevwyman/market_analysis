@@ -5,7 +5,6 @@ from io import StringIO
 import decimal
 
 import pymongo
-import typing
 
 from django.conf import settings
 
@@ -38,6 +37,8 @@ class History_DAO_Factory:
             return TiingoDAO()
         elif data_provider.name == "Onvista":
             return OnvistaDAO()
+        elif data_provider.name == "wyca-analytics":
+            return ComWycaDAO()
         else:
             raise ValueError(format)
 
@@ -803,4 +804,47 @@ class OnvistaDAO:
 
         return result
 
+
+class ComWycaDAO:
+    _instance = None
+    _api_key = "test"
+    _http_client = urllib3.PoolManager()
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ComWycaDAO, cls).__new__(cls)
+            # initialisation
+            cls._api_key = environ.get("COMWYCA_API_KEY")
+            logger.info(f"Created Comwyca")
+        return cls._instance
+
+    def lookupData(self, source:str, size:int) -> dict:
+        """
+        returns, the sentiment data
+        """
+        try:
+
+            http = self._http_client
+            r = http.request(
+                "GET",
+                f"https://wyca-analytics.com/data/sentiment",
+                fields={
+                    "apiKey": self._api_key,
+                    "source": source,
+                    "size": size
+                },
+                headers={"Content-Type":"application/json"}
+            )
+        except :
+            logger.warn("Could not connect to wyca-analytics: ")
+            return dict()
         
+        if r.status != 200:
+            logger.warn("Error getting data from wyca-analytics")
+            return dict()
+    
+
+        return json.loads(r.data.decode("utf-8"))
+        
+
+         

@@ -441,8 +441,9 @@ function generate_tp_chart(data){
 }
 
 
-function show_max_pain(underlying){
-	fetch("/data/max_pain/" + underlying, {
+function show_max_pain_history(underlying){
+	
+	fetch("/data/max_pain_history/" + underlying, {
         method: "GET",
         mode: "same-origin"
     })
@@ -468,7 +469,42 @@ function show_max_pain(underlying){
 }
 
 
+function show_max_pain_distribution(underlying){
+	fetch("/data/max_pain_distribution/" + underlying, {
+        method: "GET",
+        mode: "same-origin"
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+				document.querySelector("#chartContainer").innerHTML = ''
+				document.querySelector("#chartContainer").innerHTML = '<img class="img-fluid" src="data:image/png;base64,' + String(data.distribution.image) + '" alt="Max Pain distribution">'
+
+				document.querySelector("#mp_history").classList.remove("active")
+				document.querySelector("#mp_distribution").classList.add("active")
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+
+	return false
+}
+
+
 function generate_max_pain_chart(data){
+
+	document.querySelector("#chartContainer").innerHTML = ''
+
+	document.querySelector("#mp_history").classList.remove("active")
+	document.querySelector("#mp_distribution").classList.remove("active")
 
 	const chartOptions = {
 		width: 800,
@@ -510,6 +546,7 @@ function generate_max_pain_chart(data){
 
 	const chart = LightweightCharts.createChart(document.getElementById("chartContainer"), chartOptions);
 	
+	// show the max pain over time
 	const series = chart.addLineSeries({
 		color: '#0378A6',
 		lineWidth: 2,
@@ -518,6 +555,7 @@ function generate_max_pain_chart(data){
 		priceLineVisible: false,
 	});
 	series.setData(data.max_pain);
+	document.querySelector("#mp_history").classList.add("active")
 
 	chart.timeScale().fitContent();
 
@@ -528,10 +566,6 @@ function generate_max_pain_chart(data){
 		chart.applyOptions({ height: newRect.height, width: newRect.width })
 		})
 	resizeObserver.observe(chartContainer)
-}
-
-
-function generate_max_pain_distribution(data){
 }
 
 
@@ -633,6 +667,169 @@ function generate_corp_bonds_chart(data){
 	} else if (data.type === "Investment Grade"){
 		document.querySelector("#cb_ig").classList.add("active")
 	}
+
+	// Make Chart Responsive with screen resize
+	const resizeObserver = new ResizeObserver(entries => {
+		if (entries.length === 0 || entries[0].target !== chartContainer) { return }
+		const newRect = entries[0].contentRect
+		chart.applyOptions({ height: newRect.height, width: newRect.width })
+		})
+	resizeObserver.observe(chartContainer)
+}
+
+
+function show_sentiment(source){
+
+	fetch("/data/sentiment", {
+        method: "POST",
+        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
+        mode: "same-origin",
+        body: JSON.stringify({
+			"source": source,
+            "size": 400
+        })
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+				generate_sentiemnt_chart(data)
+
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+
+	return false
+}
+
+
+function generate_sentiemnt_chart(data){
+
+	var width = 800;
+	var height = 450;
+
+	document.querySelector("#chartContainer").innerHTML = ''
+	
+	var chart = LightweightCharts.createChart(document.querySelector("#chartContainer"), {
+		width: width,
+		height: height,
+		layout: {
+			background: {
+				type: 'solid',
+				color: '#ffffff',
+			},
+			textColor: 'rgba(3, 103, 166, 0.9)',
+		},
+		grid: {
+			vertLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+			horzLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+		},
+		crosshair: {
+			mode: LightweightCharts.CrosshairMode.Normal,
+		},
+		rightPriceScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		timeScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		
+		watermark: {
+			visible: true,
+			fontSize: 32,
+			horzAlign: 'center',
+			vertAlign: 'center',
+			color: 'rgba(4, 157, 191, 0.3)',
+			text: 'wyca-analytics.com',
+		},
+		
+	});
+
+	document.querySelector("#naaim").classList.remove("active")
+	document.querySelector("#aaii").classList.remove("active")
+	document.querySelector("#fra").classList.remove("active")
+	document.querySelector("#fra-spread").classList.remove("active")
+
+	if (data.source === "NAAIM"){
+		var data_set = chart.addLineSeries({
+			color: '#F2A057',
+			lineWidth: 2,
+			priceLineVisible: false
+		});
+		data_set.setData(data.naaim_exposure);
+		document.querySelector("#naaim").classList.add("active")
+	}
+
+	if (data.source === "AAII"){
+		var bull_data = chart.addLineSeries({
+			color: '#F2A057',
+			lineWidth: 2,
+			priceLineVisible: false
+		});
+		bull_data.setData(data.aaii_bulls);
+
+		var bear_data = chart.addLineSeries({
+			color: '#0378a6',
+			lineWidth: 2,
+			priceLineVisible: false
+		});
+		bear_data.setData(data.aaii_bears);
+
+		document.querySelector("#aaii").classList.add("active")
+	}
+
+	if (data.source === "FRA"){
+		var private_data = chart.addLineSeries({
+			color: '#F2A057',
+			lineWidth: 2,
+			priceLineVisible: false
+		});
+		private_data.setData(data.private_bears);
+
+		var institutional_data = chart.addLineSeries({
+			color: '#0378a6',
+			lineWidth: 2,
+			priceLineVisible: false
+		});
+		institutional_data.setData(data.institutional_bears);
+
+		document.querySelector("#fra").classList.add("active")
+	}
+
+	if (data.source === "FRA_SPREAD"){
+		var data_set = chart.addLineSeries({
+			color: '#F2A057',
+			lineWidth: 2,
+			priceLineVisible: false
+		});
+		data_set.setData(data.fra_spread);
+		var reference = {
+			price: 0,
+			color: '#be1238',
+			lineWidth: 2,
+			lineStyle: LightweightCharts.LineStyle.Solid,
+			axisLabelVisible: true,
+			title: "",
+		};
+		data_set.createPriceLine(reference);
+		document.querySelector("#fra-spread").classList.add("active")
+	}
+	
+
+
+	chart.timeScale().fitContent();
 
 	// Make Chart Responsive with screen resize
 	const resizeObserver = new ResizeObserver(entries => {

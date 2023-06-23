@@ -22,14 +22,14 @@ points to check:
 docker buildx build --platform=linux/amd64 -t market_analysis .
 
 # prepare for deployment
-docker tag market_analysis stevwyman/market_analysis
-docker push stevwyman/market_analysis
+docker tag market_analysis -/market_analysis
+docker push -/market_analysis
 
 # create an internal network for the images
 docker network create analysis_net
 
 # Note: port 8001
-docker run --net analysis_net --name analysis_py -p 8001:8001 market_analysis
+crontab
 docker run --net analysis_net --name analysis_mongo -p 27017:27017 mongo
 
 # alternative add the image afterwards
@@ -39,7 +39,22 @@ docker network connect analysis_net market_analysis
 docker network inspect analysis_net
 
 docker network prune
-```
+
+
+````
+
+now:
+```sh
+docker run -p 8001:8001 market_analysis
+
+docker ps
+docker exec -it <id> bash -l
+
+python manage.py migrate
+python manage.py createsuperuser
+
+python manage.py crontab add
+````
 
 ## Virtual Env
 

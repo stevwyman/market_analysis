@@ -155,3 +155,33 @@ def generate_intraday_image(notation_id) -> dict:
 
     return {"image": image_base64, "value": value, "ts":ts}
 
+from data.open_interest import get_most_recent_distribution
+
+
+def generate_max_pain_distribution(parameter) -> dict:
+    """
+
+    """
+    distribution = get_most_recent_distribution(parameter)
+
+    fig, line = plt.subplots(figsize=(8,4))
+    fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+    line.bar(distribution.keys(), distribution.values(), width=25, label="Distribution")
+    line.spines['top'].set_visible(False)
+    line.spines['right'].set_visible(False)
+
+    plt.title(parameter["product"]["name"])
+    plt.xlabel("Strike")
+    plt.ylabel("Price [€]")
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png', dpi=96, bbox_inches='tight')
+    image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8').replace('\n', '')
+    
+    # memory management
+    buf.close()
+    plt.close()
+
+    return {"image": image_base64}
+

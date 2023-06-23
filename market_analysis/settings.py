@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "data",
     "cachalot",
     "django_bootstrap5",
+#    "django_crontab",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -97,6 +98,10 @@ CACHES = {
         "LOCATION": "unique-snowflake"
     }
 }
+
+#CRONJOBS = [
+#    ("*/2 * * * *", "data.cron.my_cron_job")
+#]
 
 
 # Password validation

@@ -3,13 +3,20 @@ from django.contrib.messages import get_messages
 from django.urls import reverse
 
 from data.models import User, Watchlist, Security, DataProvider, Daily
-from data.history_dao import History_DAO_Factory, Interval
+from data.history_dao import History_DAO_Factory, Interval, ComWycaDAO
 from data.technical_analysis import SMA
 
 """
 Note, due to limitations on the API keys, we have disabled the Polygon and Tiingo tests
 also OI need to be rewritten so we do not request as many data
 """
+
+class ComWyca(TestCase):
+
+    def test_Frankfurt(self) -> None:
+        ComWycaDAO().lookupData(source="FRA", size=10)
+        ComWycaDAO().lookupData(source="AAII", size=10)
+        ComWycaDAO().lookupData(source="NAAIM", size=10)
 
 class TechnicalAnalysis(TestCase):
 

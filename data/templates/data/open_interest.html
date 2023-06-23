@@ -14,9 +14,19 @@
 
 	<div class="row py-1">
 		<div class="col col-md-8">
+			<div class="py-2">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link" id="mp_history" onClick="return show_max_pain_history('{{ underlying }}')" href="#">history</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="mp_distribution" onClick="return show_max_pain_distribution('{{ underlying }}')" href="#">distribution</a>
+                    </li>
+                </ul>
+            </div>
 			<div id="chartContainer">
 				<script>
-					show_max_pain('{{ underlying }}')
+					show_max_pain_history('{{ underlying }}')
 				</script>
 			</div>
 		</div>
