@@ -1,0 +1,99 @@
+{% extends "data/layout.html" %}
+{% load static %}
+
+{% block body %}
+
+{% load django_bootstrap5 %}
+
+<section class="py-5 text-center container">
+	<h1>Market Diary</h1>
+</section>
+
+{% csrf_token %}
+
+<div class="container">
+
+    <div class="row py-1">
+        <div class="col col-md-8">
+            <div class="py-2">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link" id="nyse" onClick="return show_md('nyse')" href="#">NYSE</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="nasdaq" onClick="return show_md('nasdaq')" href="#">NASDAQ</a>
+                    </li>
+                </ul>
+            </div>
+            
+            <div id="chartContainer">
+                <script>
+                    show_md('nyse')
+                </script>
+            </div>
+
+            <div id="legendContainer"></div>
+        </div>
+        <div class="col col-md-4">
+            <div class="py-2">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="ta_link" href="#">Current</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="fs-6 fw-light py-2" >
+                <table class="table">
+                    <tr>
+						<th></th>
+						<th>NYSE</th>
+						<th>Nasdaq</th>
+					</tr>
+					<tr>
+                        <th>Adv</th>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.1.latestClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.1.latestClose }}</td>
+                    </tr>
+                    <tr class="small">
+                        <td>prev Adv</td>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.1.previousClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.1.previousClose }}</td>
+                    </tr>
+                    <tr>
+                        <th>Dec</th>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.2.latestClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.2.latestClose }}</td>
+                    </tr>
+                    <tr class="small">
+                        <td>prev Dec</td>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.2.previousClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.2.previousClose }}</td>
+                    </tr>
+                    <tr>
+                        <th>Unc</th>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.3.latestClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.3.latestClose }}</td>
+                    </tr>
+                    <tr class="small">
+                        <td>Unc</td>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.3.previousClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.3.previousClose }}</td>
+                    </tr>
+                    <tr>
+                        <th>Trin</th>
+                        <td>{{ data.market_diary.data.instrumentSets.0.instruments.9.latestClose }}</td>
+                        <td>{{ data.market_diary.data.instrumentSets.1.instruments.6.latestClose }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-center" colspan="3">
+                            {% load timetags %}{{ data.market_diary.timestamp|print_timestamp }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

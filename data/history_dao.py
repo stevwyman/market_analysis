@@ -5,6 +5,9 @@ from io import StringIO
 import decimal
 
 import pymongo
+import threading
+
+lock = threading.Lock()
 
 from django.conf import settings
 
@@ -27,7 +30,32 @@ class Interval(Enum):
     MONTHLY = "1mo"
 
 
-class History_DAO_Factory:
+def synchronized(lock):
+    """ Synchronization decorator """
+    def wrap(f):
+        def newFunction(*args, **kw):
+            with lock:
+                return f(*args, **kw)
+        return newFunction
+    return wrap
+
+
+class SingletonOptmized(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._locked_call(*args, **kwargs)
+        return cls._instances[cls]
+
+    @synchronized(lock)
+    def _locked_call(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(SingletonOptmized, cls).__call__(*args, **kwargs)
+
+
+class History_DAO_Factory():
+
     def get_online_dao(self, data_provider):
         if data_provider.name == "Yahoo":
             return YahooDAO()
@@ -39,23 +67,32 @@ class History_DAO_Factory:
             return OnvistaDAO()
         elif data_provider.name == "wyca-analytics":
             return ComWycaDAO()
+        elif data_provider.name == "WSJ":
+            return MarketDiaryDAO()
         else:
             raise ValueError(format)
+        
 
-
-class YahooDAO:
+class YahooDAO():
     _instance = None
+    _lock = threading.Lock()
     _mongo_db = None
     _history_client = None
 
     def __new__(cls):
         if cls._instance is None:
-            logger.info("Creating YahooDAO")
-            cls._instance = super(YahooDAO, cls).__new__(cls)
-            # initialisation
-            # cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
-            cls._history_client = urllib3.PoolManager()
-            cls._mongo_db = MetaData_Factory().db("market_analysis")
+            with cls._lock:
+                # Another thread could have created the instance
+                # before we acquired the lock. So check that the
+                # instance is still nonexistent.
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    logger.debug("Creating YahooDAO")
+                    # cls._instance = super(YahooDAO, cls).__new__(cls)
+                    # initialisation
+                    # cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
+                    cls._history_client = urllib3.PoolManager()
+                    cls._mongo_db = MetaData_Factory().db("market_analysis")
         return cls._instance
 
     def lookupSymbol(self, symbol) -> dict:
@@ -121,6 +158,7 @@ class YahooDAO:
                     "currencySymbol":"$","fromCurrency":null,"toCurrency":null,"lastMarket":null,"volume24Hr":{},"volumeAllCurrencies":{},"circulatingSupply":{},"marketCap":{"raw":2649060540416,"fmt":"2.65T","longFmt":"2,649,060,540,416.00"}}}],"error":null}}
         """
         _price = self._mongo_db["yahoo_price"]
+
         try:
             # check if we have a price entry in the mongo-db
             price = _price.find_one({"symbol": symbol})
@@ -639,15 +677,12 @@ class TiingoDAO:
     _api_key = "###"
     _http_client = urllib3.PoolManager()
 
-    def __new__(cls):
-        if cls._instance is None:
-            logger.info("Creating TiingoDAO")
-            cls._instance = super(TiingoDAO, cls).__new__(cls)
-            # initialisation
-            cls._api_key = environ.get("TIINGO_API_KEY")
-            cls._mongo_db = MetaData_Factory().db("market_analysis")
-
-        return cls._instance
+    def __init__(self):
+        logger.info("Creating TiingoDAO")
+            
+        # initialisation
+        self._api_key = environ.get("TIINGO_API_KEY")
+        self._mongo_db = MetaData_Factory().db("market_analysis")
 
     def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
         """
@@ -847,4 +882,29 @@ class ComWycaDAO:
         return json.loads(r.data.decode("utf-8"))
         
 
-         
+class MarketDiaryDAO:       
+    _instance = None
+    _mongo_db = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            logger.info("Creating MarketDiaryDAO")
+            cls._instance = super(MarketDiaryDAO, cls).__new__(cls)
+            # initialisation
+            cls._mongo_db = MetaData_Factory().db("local")
+
+        return cls._instance
+
+    def lookupHistory(self, look_back=250) -> list:
+        """
+        returns, if found, the "historic" data set
+        """
+
+        _market_diary = self._mongo_db["market_diary"]
+        try:
+            cursor = _market_diary.find().sort([("timestamp", -1)]).limit(look_back)
+                    
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            logger.error("Could not write data to local storage: %s" % e)
+
+        return list(cursor)

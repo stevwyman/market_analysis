@@ -26,7 +26,7 @@ class MongoDB:
 
     def __new__(cls):
         if cls._instance is None:
-            logger.info("Creating wrapper for MongoDB")
+            logger.debug("Creating wrapper for MongoDB")
             cls._instance = super(MongoDB, cls).__new__(cls)
             # initialisation
             __db_host__ = "localhost"

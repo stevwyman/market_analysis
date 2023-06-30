@@ -839,3 +839,147 @@ function generate_sentiemnt_chart(data){
 		})
 	resizeObserver.observe(chartContainer)
 }
+
+function show_md(source){
+
+	fetch("/data/md", {
+        method: "POST",
+        headers: {"X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value},
+        mode: "same-origin",
+        body: JSON.stringify({
+			"source": source,
+            "size": 250
+        })
+    })
+    .then((response) => {
+
+        if (response.ok){
+            response.json().then( data => {
+				generate_md_chart(data)
+
+            })
+        } else {
+          response.json().then((data) => {
+              alert(data.error)
+          });
+          
+        }
+    })
+    .catch( error => {
+        console.log('Error:', error);
+    })
+
+	return false
+}
+
+
+function generate_md_chart(data){
+
+	var width = 800;
+	var height = 450;
+
+	document.querySelector("#chartContainer").innerHTML = ''
+	
+	var chart = LightweightCharts.createChart(document.querySelector("#chartContainer"), {
+		width: width,
+		height: height,
+		layout: {
+			background: {
+				type: 'solid',
+				color: '#ffffff',
+			},
+			textColor: 'rgba(3, 103, 166, 0.9)',
+		},
+		grid: {
+			vertLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+			horzLines: {
+				color: 'rgba(197, 203, 206, 0.5)',
+			},
+		},
+		crosshair: {
+			mode: LightweightCharts.CrosshairMode.Normal,
+		},
+		rightPriceScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		timeScale: {
+			borderColor: 'rgba(197, 203, 206, 0.8)',
+		},
+		
+		watermark: {
+			visible: true,
+			fontSize: 32,
+			horzAlign: 'center',
+			vertAlign: 'center',
+			color: 'rgba(4, 157, 191, 0.3)',
+			text: 'wyca-analytics.com',
+		},
+		
+	});
+
+	document.querySelector("#nyse").classList.remove("active")
+	document.querySelector("#nasdaq").classList.remove("active")
+
+	if (data.source === "nyse"){
+		document.querySelector("#nyse").classList.add("active")
+	} else if (data.source === "nasdaq"){
+		document.querySelector("#nasdaq").classList.add("active")
+	}
+	var data_set = chart.addLineSeries({
+		color: '#049DBF',
+		lineWidth: 2,
+		priceLineVisible: false
+	});
+	data_set.setData(data.ad_line);
+	
+	var ema_set = chart.addLineSeries({
+		color: '#F2A057',
+		lineWidth: 2,
+		priceLineVisible: false
+	});
+	ema_set.setData(data.ema_line)
+
+	const container = document.getElementById('legendContainer');
+	container.innerHTML = ''
+	const legend = document.createElement('div');
+	//legend.style = `position: absolute; left: 12px; top: 12px; z-index: 1; font-size: 14px; font-family: sans-serif; line-height: 18px; font-weight: 300;`;
+	legend.style.color = 'black';
+	container.appendChild(legend);
+	const getLastBar = series => {
+		const lastIndex = series.dataByIndex(Math.Infinity, -1);
+		return series.dataByIndex(lastIndex);
+	};
+	const formatPrice = price => (Math.round(price * 100) / 100).toFixed(2);
+	const setTooltipHtml = (date, price) => {
+		legend.innerHTML = `<div style="margin: 4px 0px;">AD-Line: ${price}</div><div>${date}</div>`;
+	};
+	
+	const updateLegend = param => {
+		const validCrosshairPoint = !(
+			param === undefined || param.time === undefined || param.point.x < 0 || param.point.y < 0
+		);
+		const bar = validCrosshairPoint ? param.seriesData.get(data_set) : getLastBar(data_set);
+		// time is in the same format that you supplied to the setData method,
+		// which in this case is YYYY-MM-DD
+		// const time = bar.time;
+		const time = new Date(bar.time * 1000).toLocaleDateString("en-US")
+		const price = bar.value !== undefined ? bar.value : bar.close;
+		const formattedPrice = formatPrice(price);
+		setTooltipHtml(time, formattedPrice);
+	};
+	
+	chart.subscribeCrosshairMove(updateLegend);
+	updateLegend(undefined);
+	
+	chart.timeScale().fitContent();
+
+	// Make Chart Responsive with screen resize
+	const resizeObserver = new ResizeObserver(entries => {
+		if (entries.length === 0 || entries[0].target !== chartContainer) { return }
+		const newRect = entries[0].contentRect
+		chart.applyOptions({ height: newRect.height, width: newRect.width })
+		})
+	resizeObserver.observe(chartContainer)
+}

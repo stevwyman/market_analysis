@@ -36,6 +36,9 @@ urlpatterns = [
     # sentiment
     path("sentiment", views.sentiment, name="sentiment"),
 
+    # market diary
+    path("md", views.market_diary, name="market_diary"),
+
     # build_data_set
     path("bds", views.build_data_set, name="build_data_set"),
 

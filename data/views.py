@@ -11,9 +11,12 @@ from django.shortcuts import render
 from django.urls import reverse
 
 from datetime import datetime, date
-from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI, Ichimoku, evaluate_ikh
+from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI, Ichimoku, hl_watchlist
 from data.ai_helper import generate
 from zoneinfo import ZoneInfo
+
+import multiprocessing as mp
+mp.set_start_method("fork")
 
 from logging import getLogger
 
@@ -355,6 +358,8 @@ def watchlist(request, watchlist_id: int):
 
     # building watchlist
     watchlist_entries = list()
+    to_process = list()
+    start_time = time.time()
     for security in securities:
         
         # try to get the entry from the cache
@@ -362,56 +367,17 @@ def watchlist(request, watchlist_id: int):
 
         # if not already in the cache, crete new
         if watchlist_entry is None:
-            watchlist_entry = dict()
-
-            watchlist_entry["security"] = security
-            dao = History_DAO_Factory().get_online_dao(security.data_provider)
-            history = security.daily_data.all()[:200]
+            to_process.append(security)
+        else:
+            watchlist_entries.append(watchlist_entry)
             
-            if security.data_provider.name == "Yahoo":
-                watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
-            else:
-                
-                price = dict()
-                price["change_percent"] = (
-                    100 * (history[0].close - history[1].close) / history[1].close
-                )
-                price["price"] = history[0].close
-                price["change"] = history[0].close - history[1].close
-
-                price["timestamp"] = history[0].date
-                watchlist_entry["price"] = price
-
-            try:
-                watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)[
-                    "forwardPE"
-                ]["raw"]
-            except:
-                watchlist_entry["pe_forward"] = float("nan")
-
-            try:
-                ikh = Ichimoku()
-                sma = SMA(50)
-                for h in reversed(history):
-                    close = float(h.close)
-                    ikh_entry = ikh.add(high=float(h.high_price), low=float(h.low), close=close)
-                    sma_entry = sma.add(close)
-                    sd_entry = sma.sigma_delta()
-                    hurst_entry = sma.hurst()
-                    
-                watchlist_entry["ikh_evaluation"] = evaluate_ikh(close, ikh_entry)
-                watchlist_entry["sma"] = {
-                    "hurst": hurst_entry, 
-                    "sd": sd_entry,
-                    "delta": 100 * (close - sma_entry) / sma_entry
-                    }              
-            except ValueError as va:
-                messages.warning(request, va)
-
-            cache.add(security.pk, watchlist_entry, 300)
+    with mp.Pool() as pool:
+        for result in pool.map(hl_watchlist, to_process):
+            cache.add(result["security"].pk, result, timeout=300)
+            watchlist_entries.append(result)
         
-        watchlist_entries.append(watchlist_entry)
-
+    runtime = time.time() - start_time
+    logger.debug(f"Runtime: {runtime}")
     # sorting
     order_by = request.GET.get("order_by", "name")
     direction = request.GET.get("direction", "asc")
@@ -458,6 +424,7 @@ def watchlist(request, watchlist_id: int):
             "watchlist_entries": paged_watchlist_entries,
             "order_by": order_by,
             "direction": direction,
+            "runtime": runtime
         },
     )
 
@@ -491,22 +458,12 @@ def security(request, security_id):
 
         h_price["timestamp"] = history[0].date
 
-    # for testing
-    """
-    if price["quoteType"] == "EQUITY":
-        quoteSummary = online_dao.lookup_financial_data(sec)
-    else:
-        quoteSummary = {}
-    """
-
     return render(
         request,
         "data/security.html",
         {
             "security": sec,
-            "price": h_price,
-            # for testing
-            # "quote_summary": quoteSummary
+            "price": h_price
         },
     )
 
@@ -1394,6 +1351,70 @@ def sentiment(request):
         return JsonResponse(data, status=201)
     return JsonResponse(data, status=404)
 
+
+#
+# section for Market Diary
+#
+@login_required
+def market_diary(request):
+
+    data: Dict = dict()
+
+    if request.method == "GET":
+        
+        try:
+            data_provider = DataProvider.objects.get(name="WSJ")
+        except ObjectDoesNotExist:
+            data_provider = DataProvider.objects.create(name="WSJ")
+
+        wsj = History_DAO_Factory().get_online_dao(data_provider)
+        
+        data["market_diary"] = wsj.lookupHistory(10)[0]
+        return render(request, "data/market_diary.html", {"data": data})
+
+    else:
+
+        provided_data = json.loads(request.body)
+        source = provided_data.get("source", "nyse")
+        size = provided_data.get("size", 250)
+        data["source"] = source
+        if source == "nyse":
+            source_id = 0
+        elif source == "nasdaq":
+            source_id = 1
+
+        try:
+            data_provider = DataProvider.objects.get(name="WSJ")
+        except ObjectDoesNotExist:
+            data_provider = DataProvider.objects.create(name="WSJ")
+
+        wsj = History_DAO_Factory().get_online_dao(data_provider)
+        market_diary_history = wsj.lookupHistory(size)
+
+        ad_line = list()
+        ema_line = list()
+        ema_50 = EMA(50)
+        ema_19 = EMA(19)
+        ema_39 = EMA(39)
+        for entry in reversed(market_diary_history):
+            timestamp = entry["timestamp"]/1000
+            adv = entry["data"]["instrumentSets"][source_id]["instruments"][1]["latestClose"].replace(",", "")
+            dec = entry["data"]["instrumentSets"][source_id]["instruments"][2]["latestClose"].replace(",", "")
+            current_ad = (int(adv) - int(dec)) / (int(adv) + int(dec))
+            ema_19_value = ema_19.add(current_ad)
+            ema_39_value = ema_39.add(current_ad)
+            if ema_19_value is not None and ema_39_value is not None:
+                current_ad = ema_19_value - ema_39_value
+                ad_line.append({"time": timestamp, "value": current_ad})
+
+                ema_50_value = ema_50.add(current_ad)
+                if ema_50_value is not None:
+                    ema_line.append({"time": timestamp, "value": ema_50_value})
+
+        data["ad_line"] = ad_line
+        data["ema_line"] = ema_line
+
+        return JsonResponse(data, status=201)
 
 #
 # managing participants

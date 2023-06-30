@@ -80,6 +80,17 @@ using the follow setup
 * Selenium Server 4.9.0
 * Release date 20230426
 
+## Mongo
+
+config:
+
+´´´sh
+ME_CONFIG_MONGODB_SERVER: mongo
+ME_CONFIG_SITE_BASEURL: /mongoadmin
+ME_CONFIG_BASICAUTH_USERNAME: ###
+ME_CONFIG_BASICAUTH_PASSWORD: ###
+´´´´
+
 ```sh
 docker run -d -p 4444:4444 -p 7900:7900 --shm-size="2g" selenium/standalone-firefox:latest
 docker network connect analysis_net standalone-firefox

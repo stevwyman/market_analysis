@@ -1,7 +1,7 @@
 from typing import Optional, Tuple
 from collections import deque
 from statistics import mean, stdev
-from data.models import HistoricData
+from data.models import HistoricData, Security
 from django.db.models.query import QuerySet
 
 import numpy as np
@@ -67,6 +67,9 @@ class SMA(MovingAverage):
         self._queue.appendleft(self.__value)
         self.__sma = mean(self._queue)
 
+        return self.__sma
+    
+    def current_value(self) -> float:
         return self.__sma
     
     def getN(self) -> int:
@@ -252,6 +255,8 @@ class Ichimoku:
         self.senko_a_history = list()
         self.senko_b_history = list()
 
+        self.__latest = None
+
     def add(self, high, low, close) -> Optional[dict]:
         """
         returns the current ichimoku values: tenkan, kijun, senkos (cumo), chikou and future senkos, so the furture cloud
@@ -286,7 +291,7 @@ class Ichimoku:
             self.chikous_span_1s.add(senko_span_1)
             self.chikous_span_2s.add(senko_span_2)
 
-            return {"tenkan_sen": tenkan_sen,
+            self.__latest = {"tenkan_sen": tenkan_sen,
                     "kijun_sen": kijun_sen,
                     # kumo boundaries
                     "senko_span_1_current": senko_span_1,
@@ -300,6 +305,11 @@ class Ichimoku:
                     "senko_span_1_future": self.senko_a_history[-1],
                     "senko_span_2_future": self.senko_b_history[-1]
                     }
+            
+            return self.__latest
+    
+    def current_value(self) -> Optional[dict]:
+        return self.__latest
         
     def latest(self, history: QuerySet[HistoricData]) -> dict:
         if history.count() > self.__senko_span_length:
@@ -374,3 +384,56 @@ class Hurst:
         # hurst exponent is the slope of the line of best fit
         hurst = m[0]
         return hurst
+
+from data.history_dao import History_DAO_Factory
+from data.helper import humanize_price
+
+def hl_watchlist(security:Security) -> dict:
+
+    watchlist_entry = dict()
+
+    watchlist_entry["security"] = security
+    history = security.daily_data.all()[:200]
+    
+    if security.data_provider.name == "Yahoo":
+        dao = History_DAO_Factory().get_online_dao(security.data_provider)
+        watchlist_entry["price"] = humanize_price(dao.lookupPrice(security.symbol))
+        try:
+            watchlist_entry["pe_forward"] = dao.lookup_summary_detail(security)[
+                "forwardPE"
+            ]["raw"]
+        except KeyError:
+            watchlist_entry["pe_forward"] = float("nan")
+    else:
+        
+        price = dict()
+        price["change_percent"] = (
+            100 * (history[0].close - history[1].close) / history[1].close
+        )
+        price["price"] = history[0].close
+        price["change"] = history[0].close - history[1].close
+
+        price["timestamp"] = history[0].date
+        watchlist_entry["price"] = price
+
+
+    # create our SMA and Ichimokou instances
+    ikh = Ichimoku()
+    sma = SMA(50)
+
+    # loop over the history
+    for h in reversed(history):
+        close = float(h.close)
+        ikh.add(high=float(h.high_price), low=float(h.low), close=close)
+        sma.add(close)
+    
+    # update the watchlist_entry
+    watchlist_entry["ikh_evaluation"] = evaluate_ikh(close, ikh.current_value())
+    watchlist_entry["sma"] = {
+        "hurst": sma.hurst(), 
+        "sd": sma.sigma_delta(),
+        "delta": 100 * (close - sma.current_value()) / sma.current_value()
+        }   
+    
+    return watchlist_entry
+
