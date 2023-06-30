@@ -15,15 +15,18 @@ from data.technical_analysis import EMA, SMA, BollingerBands, MACD, RSI, Ichimok
 from data.ai_helper import generate
 from zoneinfo import ZoneInfo
 
-import multiprocessing as mp
-mp.set_start_method("fork")
-
 from logging import getLogger
 
 logger = getLogger(__name__)
 
 import json
+import multiprocessing as mp
+import platform
 import time
+
+if platform.system() == "Darwin":
+    logger.info("As the system is 'Darwin', we are using 'fork' to start new processes.")
+    mp.set_start_method("fork")
 
 from data.history_dao import History_DAO_Factory, Interval
 from data.open_interest import (

@@ -92,7 +92,9 @@ class YahooDAO():
                     # initialisation
                     # cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
                     cls._history_client = urllib3.PoolManager()
-                    cls._mongo_db = MetaData_Factory().db("market_analysis")
+                    # cls._mongo_db = MetaData_Factory().db("market_analysis")
+                    # we have to ensure, that each process receives its own client 
+                    cls._mongo_db = MetaData_Factory().client().db["market_analysis"]
         return cls._instance
 
     def lookupSymbol(self, symbol) -> dict:
