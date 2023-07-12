@@ -86,9 +86,9 @@ class YahooDAO():
                 # before we acquired the lock. So check that the
                 # instance is still nonexistent.
                 if cls._instance is None:
-                    cls._instance = super().__new__(cls)
+                    # cls._instance = super().__new__(cls)
                     logger.debug("Creating YahooDAO")
-                    # cls._instance = super(YahooDAO, cls).__new__(cls)
+                    cls._instance = super(YahooDAO, cls).__new__(cls)
                     # initialisation
                     # cls._http_client = urllib3.HTTPConnectionPool("yahoo.com", maxsize=10)
                     cls._history_client = urllib3.PoolManager()
@@ -163,24 +163,24 @@ class YahooDAO():
 
         try:
             # check if we have a price entry in the mongo-db
-            price = _price.find_one({"symbol": symbol})
-            if price is None:
+            db_price = _price.find_one({"symbol": symbol})
+            if db_price is None:
                 logger.debug("no 'price' for %s" % symbol)
             else:
                 # check if the available entry is older than 5 minutes
-                entry_ts = price["timestamp"]
+                entry_ts = db_price["timestamp"]
                 current_ts = datetime.now().timestamp()
 
                 if entry_ts + 300 > current_ts:   # for production 5 minutes
-                # if entry_ts + 3600 > current_ts:  # for testing 1 hour
+                #if entry_ts + 3600 > current_ts:  # for testing 1 hour
                     # print(f"serving price for {symbol} from db")
                     logger.debug("serving price for %s from db" % symbol)
-                    return price["price"]
+                    return db_price["price"]
                 else:
                     logger.debug("update of price required for %s" % symbol)
 
         except pymongo.errors.ServerSelectionTimeoutError as e:
-            print("Could not write data to locale storage: ", e)
+            logger.error("Could not read data from locale storage: ", e)
 
         http = self._history_client
         r = http.request(
@@ -204,8 +204,22 @@ class YahooDAO():
             _price.update_one({"symbol": symbol}, {"$set": _data}, upsert=True)
             return price
         else:
-            error = summary_profile["quoteSummary"]["error"]
-            return {"error": error["description"]}
+            logger.error("status for requesting 'price' of %s: %s " % (symbol, r.status))
+            if "finance" in summary_profile:
+                error_description = summary_profile["finance"]["error"]["description"]
+            elif "quoteSummary" in summary_profile:
+                error_description = summary_profile["quoteSummary"]["error"]["description"]
+            else:
+                logger.error(summary_profile)
+                error_description = f"could not get quoteSummary for {symbol}"
+            
+            logger.error(f"with error: {error_description}")
+            if db_price is not None:
+                return db_price["price"]
+            else:
+                return {"error": error_description}
+
+            
 
     def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
         """
@@ -675,16 +689,27 @@ class PolygonDAO:
 
 class TiingoDAO:
     _instance = None
+    _lock = threading.Lock()
     _mongo_db = None
+    _history_client = None
     _api_key = "###"
-    _http_client = urllib3.PoolManager()
 
-    def __init__(self):
-        logger.info("Creating TiingoDAO")
-            
-        # initialisation
-        self._api_key = environ.get("TIINGO_API_KEY")
-        self._mongo_db = MetaData_Factory().db("market_analysis")
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                # Another thread could have created the instance
+                # before we acquired the lock. So check that the
+                # instance is still nonexistent.
+                if cls._instance is None:
+                    # cls._instance = super().__new__(cls)
+                    logger.debug("Creating Tiingo Singletonn")
+                    cls._instance = super(TiingoDAO, cls).__new__(cls)
+                    # initialisation
+                    cls._api_key = environ.get("TIINGO_API_KEY")
+                    cls._history_client = urllib3.PoolManager()
+                    # we have to ensure, that each process receives its own client 
+                    cls._mongo_db = MetaData_Factory().client().db["market_analysis"]
+        return cls._instance
 
     def lookupHistory(self, security: Security, interval=Interval.DAILY, look_back=200):
         """
@@ -700,7 +725,7 @@ class TiingoDAO:
             f"requesting {security.symbol} from: {fromDate} to: {endDate} with interval: {interval.value}"
         )
 
-        http = self._http_client
+        http = self._history_client
         r = http.request(
             "GET",
             "https://api.tiingo.com/tiingo/daily/" + security.symbol + "/prices",

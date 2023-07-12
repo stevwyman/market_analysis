@@ -1,0 +1,13 @@
+version: '3.11'
+services:
+ webapp:
+  build: .
+  restart: unless-stopped
+  ports:
+   - "8000:8001"
+  # run the default command: from the image; no override
+  # skip unnecessary links:, container_name:, volumes: options
+ cron:
+  build: .          # same as main application
+  restart: unless-stopped
+  command: cron -f  # as a long-running foreground process

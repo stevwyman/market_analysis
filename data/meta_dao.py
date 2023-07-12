@@ -12,7 +12,8 @@ class MetaData_Factory:
         Factory methode to provide access to the specified database,
         Note: in case the requested database does not exist, a new one is created
         """
-        return MongoDB().db(name)
+        #return MongoDB().db(name)
+        return MongoDB_Singleton().db(name)
     
     def client(self):
         return MongoDB_Singleton().client()
@@ -41,7 +42,7 @@ class MongoDB_Singleton:
             try:
                 cls._mongo_client.server_info()
             except pymongo.errors.ServerSelectionTimeoutError:
-                exit("Mongo instance not reachable.")
+                raise RuntimeError("Mongo instance not reachable.")
 
         return cls._instance
 

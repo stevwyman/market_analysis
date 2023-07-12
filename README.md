@@ -29,7 +29,6 @@ docker push -/market_analysis
 docker network create analysis_net
 
 # Note: port 8001
-crontab
 docker run --net analysis_net --name analysis_mongo -p 27017:27017 mongo
 
 # alternative add the image afterwards

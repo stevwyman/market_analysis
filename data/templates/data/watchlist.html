@@ -12,8 +12,18 @@
             <thead>
                 <tr class="text-center">
                     <th scope="col" class="d-table-cell d-sm-none">Symbol</th>
-                    <th scope="col" class="d-none d-sm-table-cell">Name</th>
-                    <th scope="col" class="d-none d-sm-table-cell">latest</th>
+                    <th scope="col" class="d-none d-sm-table-cell">
+                        Name
+                        {% if watchlist is not None %}
+                        <br><small><a href="?order_by=name&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=name&direction=asc" class="no-underline">&uarr;</a></small>
+                        {% endif %}
+                    </th>
+                    <th scope="col" class="d-none d-sm-table-cell">
+                        latest
+                        {% if watchlist is not None %}
+                        <br><small><a href="?order_by=latest&direction=desc" class="no-underline">&darr;</a>&nbsp;<a href="?order_by=latest&direction=asc" class="no-underline">&uarr;</a></small>
+                        {% endif %}
+                    </th>
                     <th colspan="2" scope="col">
                         change
                         {% if watchlist is not None %}
@@ -55,10 +65,10 @@
             </thead>
             <tbody>
                 {% for watchlist_entry in watchlist_entries %}
-                <tr>
+                <tr onclick="window.location='{% url 'security' watchlist_entry.security.id %}'" style="cursor:hand;cursor:pointer">
                     <td class="d-table-cell d-sm-none"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.symbol }}</a></th>
                     <td class="d-none d-sm-table-cell"><a href="{% url 'security' watchlist_entry.security.id %}">{{ watchlist_entry.security.name }}</a></th>
-                    <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.price.currency_symbol }}&nbsp;{{ watchlist_entry.price.price|floatformat:2 }}<br><small>{% load humanize %}{{ watchlist_entry.price.local_timestamp|naturaltime }}{{ watchlist_entry.price.timestamp }}</small></td>
+                    <td class="text-end d-none d-sm-table-cell">{{ watchlist_entry.price.currency_symbol }}&nbsp;{{ watchlist_entry.price.price|floatformat:2 }}<br><small>{% load humanize %}{{ watchlist_entry.price.local_timestamp|naturaltime }}</small></td>
                     <!-- change percent br percent-->
                     {% if watchlist_entry.price.change_percent >= 0 %}
                     <td class="text-end text-success">

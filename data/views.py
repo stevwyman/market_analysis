@@ -96,7 +96,12 @@ def start(request):
     djia = Security.objects.get(data_provider=yahoo, symbol="^DJI")
     sec_2_watch.append(djia)
 
-    dao = History_DAO_Factory().get_online_dao(data_provider=yahoo)
+    try:
+        dao = History_DAO_Factory().get_online_dao(data_provider=yahoo)
+    except RuntimeError as re:
+        messages.error(request, re)
+        return HttpResponseRedirect(reverse("index"))
+
     user = request.user
 
     for security in sec_2_watch:
@@ -364,23 +369,31 @@ def watchlist(request, watchlist_id: int):
     to_process = list()
     start_time = time.time()
     for security in securities:
-        
+
         # try to get the entry from the cache
         watchlist_entry = cache.get(security.pk)
 
-        # if not already in the cache, crete new
+        # if not already in the cache ...
         if watchlist_entry is None:
+            # ... add to the list of to-be-processed
             to_process.append(security)
         else:
+            # ... else, add to the the result 
             watchlist_entries.append(watchlist_entry)
             
-    with mp.Pool() as pool:
-        for result in pool.map(hl_watchlist, to_process):
-            cache.add(result["security"].pk, result, timeout=300)
-            watchlist_entries.append(result)
+    # if anythig is to be processed ...
+    if len(to_process) > 0:
+        # ... build a threat pool
+        with mp.Pool() as pool:
+            # process each entry
+            for result in pool.map(hl_watchlist, to_process):
+                # use a shallow copy, as the results come from another process
+                result_c = result.copy()
+                cache.add(result["security"].pk, result_c, timeout=300)
+                watchlist_entries.append(result_c)
         
     runtime = time.time() - start_time
-    logger.debug(f"Runtime: {runtime}")
+    
     # sorting
     order_by = request.GET.get("order_by", "name")
     direction = request.GET.get("direction", "asc")
@@ -405,6 +418,10 @@ def watchlist(request, watchlist_id: int):
         watchlist_entries.sort(key=lambda x: x["sma"]["delta"], reverse=_b_direction)
     elif order_by == "ikh":
         watchlist_entries.sort(key=lambda x: x["ikh_evaluation"], reverse=_b_direction)
+    elif order_by == "name":
+        watchlist_entries.sort(key=lambda x: x["security"].name, reverse=_b_direction)
+    elif order_by == "latest":
+        watchlist_entries.sort(key=lambda x: x["price"]["local_timestamp"], reverse=_b_direction)
 
     # pagination
     paginator = Paginator(watchlist_entries, 6)
@@ -1011,26 +1028,31 @@ def security_history(request, security_id) -> JsonResponse:
 
 @login_required()
 @user_passes_test(is_manager, login_url="start")
-def update_all(request):
-    data = {}
+def update_by_provider(request, data_provider:str):
+    data = dict()
 
-    all_securities = Security.objects.all()
-    for security in all_securities:
+    try:
+        dp = DataProvider.objects.get(name=data_provider)
+        logger.info(f"found dataprovider {dp}")
+    except ObjectDoesNotExist:
+        messages.warning(request, f"no data provider found for '{data_provider}'")
+        data["error"] = f"no data provider found for '{data_provider}'"
+        return JsonResponse(data, status=501)
+
+    for security in Security.objects.filter(data_provider=dp).all():
         _today = date.today()
-        last_updated = security.dailyupdate_data.all().first()
+        last_updated: DailyUpdate = security.dailyupdate_data.first()
 
         if last_updated is not None:
             if last_updated.date == _today:
                 logger.info(f"no update required for {security}")
                 continue
 
-        if security.data_provider.name != "Yahoo":
-            continue
-
         online_dao = History_DAO_Factory().get_online_dao(security.data_provider)
 
         # request new history from online dao
         result = online_dao.lookupHistory(security=security, look_back=5000)
+        logger.info(len(result))
         if len(result) > 10:
             try:
                 with transaction.atomic():
@@ -1100,40 +1122,47 @@ def open_interest(request, underlying: str):
         max_pain_over_time = sorted(
             get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
         )
-        most_recent = {}
+        most_recent = dict()
         if len(max_pain_over_time) > 0:
             latest = max_pain_over_time[0]
             most_recent["ts"] = latest[0]
             most_recent["strike"] = latest[1]
-        else:
-            messages.warning(request, "no data found")
     else:
         messages.error(request, "Underlying not found")
         return HttpResponseRedirect(reverse("watchlists"))
-
+    
     # using POST for requesting an update of data
     if request.method == "POST":
-        messages.info(request, "Data has been updated")
         update_data(parameter)
+        messages.info(request, "Data has been updated")
         return HttpResponseRedirect(
             reverse("open_interest", kwargs={"underlying": underlying})
         )
+    else:
+        max_pain_list = list()
+        for p in underlyings:
+            parameter = {"product": underlyings[p], "expiry_date": expiry_date}
+            max_pain_over_time = sorted(
+                get_max_pain_history(parameter), key=lambda x: x[0], reverse=True
+            )
+            max_pain = dict()
+            max_pain["product"] = p
+            if len(max_pain_over_time) > 0:
+                latest = max_pain_over_time[0]
+                max_pain["ts"] = latest[0]
+                max_pain["strike"] = latest[1]
+            max_pain_list.append(max_pain)
 
-
-    ## for testing
-    distribution_image = generate_max_pain_distribution(parameter)
-
-    return render(
-        request,
-        "data/open_interest.html",
-        {
-            "underlying": underlying,
-            "product": product,
-            "latest": most_recent,
-            "underlyings": underlyings,
-            #
-            "distribution": distribution_image
-        },
+        return render(
+            request,
+            "data/open_interest.html",
+            {
+                "underlying": underlying,
+                "product": product,
+                "latest": most_recent,
+                "underlyings": underlyings,
+                "max_pain_list": max_pain_list
+            },
     )
 
 
@@ -1567,3 +1596,4 @@ from data.sp500_helper import import_sp500
 def create_sp500_list(request):
     import_sp500()
     return JsonResponse({"status": "all done"}, status=201)
+

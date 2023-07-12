@@ -76,7 +76,8 @@
                                 </li>
                                 {% endif %}
                                 {% if user.is_authenticated and user.role == 1 %}
-                                <li><a class="dropdown-item" href="{% url 'update_all' %}">update history</a></li>
+                                <li><a class="dropdown-item" href="{% url 'update_by_provider' 'Yahoo' %}">update history (yahoo)</a></li>
+                                <li><a class="dropdown-item" href="{% url 'update_by_provider' 'Tiingo' %}">update history (tiingo)</a></li>
                                 <li><a class="dropdown-item" href="{% url 'create_default_list' %}">duild default</a></li>
                                 <li><a class="dropdown-item" href="{% url 'create_sp500_list' %}">build S&P 500</a></li>
                                 <li><a class="dropdown-item" href="{% url 'build_data_set' %}">build dataset</a></li>

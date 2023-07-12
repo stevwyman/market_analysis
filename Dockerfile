@@ -1,7 +1,7 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
 FROM python:3.11-slim
 
-#RUN apt-get update && apt-get -y install cron
+#RUN apt-get update && apt-get -y install cron && touch /var/log/cron.log
 
 EXPOSE 8001
 
@@ -30,6 +30,10 @@ COPY . /usr/src/app
 WORKDIR /usr/src/app
 
 # Install pip requirements
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-CMD ["python3", "manage.py", "runserver", "0.0.0.0:8001"]
+#CMD ["python3", "manage.py", "runserver", "0.0.0.0:8001"]
+#RUN ["chmod", "+x", "/usr/src/app/docker-entrypoint.sh"]
+#ENTRYPOINT ["/usr/src/app/docker-entrypoint.sh"]  # must be JSON-array syntax
+CMD ["./manage.py", "runserver", "0.0.0.0:8001"]  # as before

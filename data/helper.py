@@ -14,7 +14,10 @@ import matplotlib.dates as mdates
 
 
 def humanize_price(price: dict) -> dict:
-    data = {}
+    data = dict()
+    if "error" in price:
+        return data
+    
     data["currency_symbol"] = price["currencySymbol"]
 
     orig_timezone = ZoneInfo("America/New_York")

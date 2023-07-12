@@ -3,6 +3,7 @@ from collections import deque
 from statistics import mean, stdev
 from data.models import HistoricData, Security
 from django.db.models.query import QuerySet
+from datetime import datetime
 
 import numpy as np
 
@@ -391,7 +392,6 @@ from data.helper import humanize_price
 def hl_watchlist(security:Security) -> dict:
 
     watchlist_entry = dict()
-
     watchlist_entry["security"] = security
     history = security.daily_data.all()[:200]
     
@@ -414,26 +414,32 @@ def hl_watchlist(security:Security) -> dict:
         price["change"] = history[0].close - history[1].close
 
         price["timestamp"] = history[0].date
+        
+        price["local_timestamp"] = datetime.combine(history[0].date, datetime.min.time())
         watchlist_entry["price"] = price
 
+    if len(history) > 50:
 
-    # create our SMA and Ichimokou instances
-    ikh = Ichimoku()
-    sma = SMA(50)
+        # create our SMA and Ichimokou instances
+        ikh = Ichimoku()
+        sma = SMA(50)
 
-    # loop over the history
-    for h in reversed(history):
-        close = float(h.close)
-        ikh.add(high=float(h.high_price), low=float(h.low), close=close)
-        sma.add(close)
-    
-    # update the watchlist_entry
-    watchlist_entry["ikh_evaluation"] = evaluate_ikh(close, ikh.current_value())
-    watchlist_entry["sma"] = {
-        "hurst": sma.hurst(), 
-        "sd": sma.sigma_delta(),
-        "delta": 100 * (close - sma.current_value()) / sma.current_value()
-        }   
+        # loop over the history
+        for h in reversed(history):
+            close = float(h.close)
+            ikh.add(high=float(h.high_price), low=float(h.low), close=close)
+            sma.add(close)
+        
+        # update the watchlist_entry
+        watchlist_entry["ikh_evaluation"] = evaluate_ikh(close, ikh.current_value())
+        watchlist_entry["sma"] = {
+            "hurst": sma.hurst(), 
+            "sd": sma.sigma_delta(),
+            "delta": 100 * (close - sma.current_value()) / sma.current_value()
+            }   
+    else:
+        watchlist_entry["ikh_evaluation"] = float("nan")
+        watchlist_entry["sma"] = {"hurst": float("nan"), "sd": float("nan"), "delta": float("nan")}
     
     return watchlist_entry
 
